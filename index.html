@@ -3,257 +3,428 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI秘書×ゲーム感覚タスク管理アプリ</title>
+    <title>社内AI活用コンペ - タスク管理アプリ</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
-        body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #eef2f7;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 95vh;
-        }
-        .container {
-            width: 100%;
-            max-width: 1000px;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-            overflow: hidden;
-            display: flex;
-            height: 85vh;
-        }
-        .main-panel {
-            flex: 2;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #e0e0e0;
-        }
-        .side-panel {
-            flex: 1;
-            background-color: #f8f9fa;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        .header {
-            background-color: #4A90E2;
-            color: white;
-            padding: 15px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-        .chat-area {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            background-color: #fdfdfd;
-            display: flex;
-            flex-direction: column;
-        }
-        .message {
-            margin-bottom: 12px;
-            padding: 10px 14px;
-            border-radius: 12px;
-            max-width: 75%;
-            line-height: 1.4;
-        }
-        .ai-message {
-            background-color: #E1F5FE;
-            align-self: flex-start;
-            border-top-left-radius: 0;
-        }
-        .user-message {
-            background-color: #DCF8C6;
-            align-self: flex-end;
-            border-top-right-radius: 0;
-        }
-        .user-input-area {
-            display: flex;
-            padding: 15px;
-            border-top: 1px solid #eee;
-            background: white;
-        }
-        input[type="text"] {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 1rem;
-            outline: none;
-        }
-        button {
-            background-color: #4A90E2;
-            color: white;
-            border: none;
-            padding: 0 20px;
-            margin-left: 10px;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        button:hover { background-color: #357ABD; }
-
-        .status-card {
-            background: white;
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-            border-left: 5px solid #4A90E2;
-        }
-        .status-title { font-size: 0.9rem; color: #666; margin-bottom: 5px; }
-        .status-value { font-size: 1.6rem; font-weight: bold; color: #333; }
-        
-        .exp-bar-container {
-            background-color: #e0e0e0;
-            border-radius: 10px;
-            height: 12px;
-            overflow: hidden;
-            margin-top: 8px;
-        }
-        .exp-bar {
-            background-color: #2ECC71;
-            width: 0%;
-            height: 100%;
-            transition: width 0.3s ease;
-        }
-        .log-list {
-            margin: 0;
-            padding-left: 20px;
-            font-size: 0.9rem;
-            color: #555;
-            line-height: 1.6;
-        }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; }
     </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-    <div class="container">
-        <div class="main-panel">
-            <div class="header">🤖 AI秘書 タスク管理ルーム (匿名モード)</div>
-            <div class="chat-area" id="chatArea">
-                <div class="message ai-message">
-                    【本物モード起動】お疲れ様です！業務の開始や終了を教えてください。<br>
-                    例：「資料作成はじめます」「会議おわり」
+    <header class="bg-slate-900 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold tracking-wider">AIコンペ開発システム</h1>
+            <div class="flex items-center gap-4">
+                <div class="bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                    <span class="text-xs text-amber-400 font-bold">Lv.</span>
+                    <span id="user-level" class="text-sm font-bold">1</span>
+                </div>
+                <div class="w-32 bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                    <div id="exp-bar" class="bg-amber-400 h-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <span id="user-exp-text" class="text-xs text-slate-400">0 / 100 EXP</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 container mx-auto p-4 max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6 my-6">
+        
+        <div class="flex flex-col gap-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="calendar-month-year" class="text-base font-bold text-slate-700">2026年 5月</h2>
+                    <div class="flex gap-1">
+                        <button id="btn-prev-month" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition cursor-pointer">◀</button>
+                        <button id="btn-next-month" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition cursor-pointer">▶</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400 mb-2">
+                    <div class="text-rose-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-indigo-500">土</div>
+                </div>
+                <div id="calendar-days" class="grid grid-cols-7 gap-1 text-center text-sm">
+                    </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[320px]">
+                <div class="p-3 border-b border-slate-100 text-xs font-bold flex items-center gap-2">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>AIアシスタント
+                </div>
+                <div id="chat-box" class="flex-1 p-3 overflow-y-auto space-y-3 text-xs">
+                    <div class="bg-slate-100 text-slate-700 p-2.5 rounded-2xl rounded-tl-none max-w-[85%]">
+                        カレンダー機能が合体しました！日付を選択すると、その日の実績を瞬時に呼び出せます。実績がある日には緑のドットが点灯しますよ。
+                    </div>
+                </div>
+                <div class="p-2 border-t border-slate-100 flex gap-1.5">
+                    <input type="text" id="chat-input" placeholder="AIに質問する..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500 transition">
+                    <button id="btn-send" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-medium hover:bg-indigo-700 transition cursor-pointer">送信</button>
                 </div>
             </div>
-            <div class="user-input-area">
-                <input type="text" id="userInput" placeholder="メッセージを入力...">
-                <button onclick="sendMessage()">送信</button>
+        </div>
+        
+        <div class="md:col-span-2 flex flex-col gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <span class="inline-block w-2 h-4 bg-indigo-600 rounded"></span>タスクの計測
+                    </h2>
+                    <div class="flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+                        <span>選択中の日付:</span>
+                        <span id="target-date-display">----/--/--</span>
+                    </div>
+                </div>
+                
+                <div class="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-xl border border-slate-200 px-4">
+                    <div class="w-full max-w-md mb-4">
+                        <label for="task-name-input" class="block text-xs font-bold text-slate-500 mb-1">実行するタスク名</label>
+                        <input type="text" id="task-name-input" placeholder="例：コンペ資料の作成、プロトタイプ実装" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition shadow-inner">
+                    </div>
+
+                    <div id="timer-display" class="text-5xl font-mono font-bold tracking-tight text-slate-700 mb-6">00:00:00</div>
+                    
+                    <div class="flex gap-4">
+                        <button id="btn-start" class="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition shadow-sm active:scale-95 cursor-pointer">計測開始</button>
+                        <button id="btn-stop" class="px-6 py-2.5 bg-rose-600 text-white font-medium rounded-lg hover:bg-rose-700 transition shadow-sm active:scale-95 cursor-pointer hidden">計測終了</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                    <span class="inline-block w-2 h-4 bg-emerald-500 rounded"></span><span id="record-title-date">選択日</span>の作業実績
+                </h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-xs uppercase text-slate-400">
+                                <th class="py-2 pl-2">タスク名</th>
+                                <th class="py-2">完了時刻</th>
+                                <th class="py-2">作業時間</th>
+                                <th class="py-2 pr-2">獲得EXP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-table-body">
+                            </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <div class="side-panel">
-            <div class="header" style="background-color: #2C3E50; border-radius: 8px;">📊 ステータス</div>
-            
-            <div class="status-card">
-                <div class="status-title">現在のレベル</div>
-                <div class="status-value" id="levelVal">Lv.1</div>
-                <div style="font-size: 0.8rem; color:#888; margin-top:5px;">次のレベルまで: <span id="expText">0</span> / 100 EXP</div>
-                <div class="exp-bar-container">
-                    <div class="exp-bar" id="expBar"></div>
-                </div>
-            </div>
+    </main>
 
-            <div class="status-card" style="border-left-color: #E67E22; flex: 1; overflow-y: auto;">
-                <div class="status-title">⏳ 本日の作業記録（リアルタイム計測）</div>
-                <ul class="log-list" id="logList">
-                    </ul>
-            </div>
-        </div>
-    </div>
+    <footer class="bg-slate-100 text-center py-4 text-xs text-slate-400 border-t border-slate-200">
+        &copy; 2026 社内AI活用コンペ開発チーム
+    </footer>
 
     <script>
-        let level = 1;
-        let exp = 0;
-        let startTime = null; // 開始時刻を保存する変数
-        let currentTask = "";
+        // --- 1. アプリ全体のデータ構造 ---
+        let AppState = {
+            level: 1,
+            exp: 0,
+            taskLogs: [] // { id, taskName, startTime, endTime, durationSeconds, expGained }
+        };
 
-        function sendMessage() {
-            const input = document.getElementById('userInput');
-            const chatArea = document.getElementById('chatArea');
-            const text = input.value.trim();
-            
-            if (text === '') return;
+        const STORAGE_KEY = 'ai_comp_app_state';
 
-            appendMessage(text, 'user-message');
-            input.value = '';
+        // 現在アプリ上で「選択されている日付」（初期値は今日）
+        let currentSelectedDate = new Date();
+        // カレンダーが現在「表示している月」の基準日
+        let calendarCurrentMonthDate = new Date();
 
-            setTimeout(() => {
-                let aiResponse = "";
-                const now = new Date(); // 今の時刻を取得
+        // --- 2. 状態管理（セーブ＆ロード） ---
+        function saveStateToLocalStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState));
+            console.log('データをLocalStorageに自動保存しました。', AppState);
+        }
 
-                if (text.includes('はじめ') || text.includes('スタート') || text.includes('開始')) {
-                    // ★現実の開始時刻を記憶
-                    startTime = now;
-                    currentTask = text.replace(/はじめます|スタート|開始|します/g, "");
-                    
-                    // 時間を分かりやすく表示（例: 14:30）
-                    const timeStr = `${startTime.getHours()}:${String(startTime.getMinutes()).padStart(2, '0')}`;
-                    aiResponse = `了解しました！${timeStr} から「${currentTask}」の記録を開始します。応援しています！(＋10 EXP)`;
-                    gainExp(10);
-                } 
-                else if (text.includes('おわり') || text.includes('終了') || text.includes('完了')) {
-                    if (startTime) {
-                        const endTime = now;
-                        
-                        // ★【本物モードの時間計算】終了時刻 - 開始時刻（ミリ秒を分に変換）
-                        const diffMs = endTime - startTime;
-                        let diffMinutes = Math.floor(diffMs / 1000 / 60); 
-                        
-                        // テスト用に、1分未満（同じ分内）で終了した場合は「1分」として計算する優しい設計
-                        if (diffMinutes < 1) {
-                            diffMinutes = 1;
-                        }
-                        
-                        aiResponse = `お疲れ様でした！「${currentTask}」にかかった時間は 約 ${diffMinutes} 分でした。素晴らしい集中力です！(＋40 EXP)`;
-                        
-                        const logList = document.getElementById('logList');
-                        const li = document.createElement('li');
-                        li.innerText = `${currentTask} : ${diffMinutes}分`;
-                        logList.appendChild(li);
+        function loadStateFromLocalStorage() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                try {
+                    AppState = JSON.parse(savedData);
+                    console.log('LocalStorageからデータを読み込みました。', AppState);
+                } catch (e) {
+                    console.error('データ読み込み失敗。初期状態から開始します。', e);
+                }
+            }
+            updateStatusUI();
+            renderLogs();
+            renderCalendar();
+        }
 
-                        startTime = null; 
-                        gainExp(40);
-                    } else {
-                        aiResponse = "おや？まだ開始のメッセージが入力されていないようです。「〇〇はじめます」と教えてください。";
-                    }
-                } 
-                else {
-                    aiResponse = "メッセージありがとうございます！業務の開始時は「〜開始」、終了時は「〜終了」と打つと、私が時間を自動で集計しますよ！(＋5 EXP)";
-                    gainExp(5);
+        // --- 3. UI更新用の関数 ---
+        function updateStatusUI() {
+            const nextLevelExp = 100;
+            const progressPercent = Math.min((AppState.exp / nextLevelExp) * 100, 100);
+
+            document.getElementById('user-level').innerText = AppState.level;
+            document.getElementById('user-exp-text').innerText = `${AppState.exp} / ${nextLevelExp} EXP`;
+            document.getElementById('exp-bar').style.width = `${progressPercent}%`;
+        }
+
+        // 指定した日付にログ（実績）が存在するか判定するヘルパー関数
+        function hasLogsOnDate(year, month, day) {
+            return AppState.taskLogs.some(log => {
+                const logDate = new Date(log.endTime);
+                return logDate.getFullYear() === year &&
+                       logDate.getMonth() === month &&
+                       logDate.getDate() === day;
+            });
+        }
+
+        // --- 4. 動的カレンダー生成ロジック ---
+        function renderCalendar() {
+            const daysContainer = document.getElementById('calendar-days');
+            const monthYearTitle = document.getElementById('calendar-month-year');
+            daysContainer.innerHTML = '';
+
+            const year = calendarCurrentMonthDate.getFullYear();
+            const month = calendarCurrentMonthDate.getMonth();
+
+            // タイトルの更新
+            monthYearTitle.innerText = `${year}年 ${(month + 1)}月`;
+
+            // 月の最初の日の曜日と、月の日数を取得
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const totalDays = new Date(year, month + 1, 0).getDate();
+
+            // 空白のマス（前の月の余り）
+            for (let i = 0; i < firstDayIndex; i++) {
+                const blank = document.createElement('div');
+                daysContainer.appendChild(blank);
+            }
+
+            // 日付マスの生成
+            for (let day = 1; day <= totalDays; day++) {
+                const dayBtn = document.createElement('button');
+                dayBtn.innerText = day;
+                
+                // 基本スタイル（丸型、カーソルポインタ）
+                dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-medium transition relative cursor-pointer active:scale-90";
+
+                // 選択されている日付かどうかの判定
+                const isSelected = currentSelectedDate.getFullYear() === year &&
+                                   currentSelectedDate.getMonth() === month &&
+                                   currentSelectedDate.getDate() === day;
+
+                // 今日かどうかの判定
+                const today = new Date();
+                const isToday = today.getFullYear() === year &&
+                                today.getMonth() === month &&
+                                today.getDate() === day;
+
+                if (isSelected) {
+                    // 選択中のスタイル（濃いインディゴ）
+                    dayBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+                } else if (isToday) {
+                    // 今日のスタイル（薄いインディゴの枠線）
+                    dayBtn.classList.add('border-2', 'border-indigo-600', 'text-indigo-600', 'font-bold');
+                } else {
+                    // 通常のスタイル
+                    dayBtn.classList.add('text-slate-600', 'hover:bg-slate-100');
                 }
 
-                appendMessage(aiResponse, 'ai-message');
-            }, 500);
-        }
+                // 【新機能】その日に実績ログデータがあれば、小さな緑のドット（・）を下に配置
+                if (hasLogsOnDate(year, month, day)) {
+                    const dot = document.createElement('span');
+                    dot.className = `w-1 h-1 rounded-full absolute bottom-1 ${isSelected ? 'bg-white' : 'bg-emerald-500'}`;
+                    dayBtn.appendChild(dot);
+                }
 
-        function appendMessage(text, className) {
-            const chatArea = document.getElementById('chatArea');
-            const div = document.createElement('div');
-            div.className = `message ${className}`;
-            div.innerHTML = text;
-            chatArea.appendChild(div);
-            chatArea.scrollTop = chatArea.scrollHeight;
-        }
+                // 日付クリックイベント
+                dayBtn.addEventListener('click', () => {
+                    currentSelectedDate = new Date(year, month, day);
+                    renderCalendar(); // カレンダーの選択表示を更新
+                    renderLogs();     // 右側の実績リストを更新
+                });
 
-        function gainExp(amount) {
-            exp += amount;
-            if (exp >= 100) {
-                level += 1;
-                exp = exp - 100;
-                alert(`🎉 レベルアップ！ Lv.${level} になりました！`);
-                appendMessage(`🎊 【SYSTEM】レベルアップ！Lv.${level} になりました。この調子で頑張りましょう！`, 'ai-message');
+                daysContainer.appendChild(dayBtn);
             }
-            document.getElementById('levelVal').innerText = `Lv.${level}`;
-            document.getElementById('expText').innerText = exp;
-            document.getElementById('expBar').style.width = `${exp}%`;
         }
+
+        // カレンダーの月移動ボタンのイベント
+        document.getElementById('btn-prev-month').addEventListener('click', () => {
+            calendarCurrentMonthDate.setMonth(calendarCurrentMonthDate.getMonth() - 1);
+            renderCalendar();
+        });
+        document.getElementById('btn-next-month').addEventListener('click', () => {
+            calendarCurrentMonthDate.setMonth(calendarCurrentMonthDate.getMonth() + 1);
+            renderCalendar();
+        });
+
+
+        // --- 5. 実績ログの描画ロジック（選択された日付で動的にフィルター） ---
+        function renderLogs() {
+            const tbody = document.getElementById('log-table-body');
+            tbody.innerHTML = '';
+
+            // 現在選択されている年月日を取得
+            const targetYear = currentSelectedDate.getFullYear();
+            const targetMonth = currentSelectedDate.getMonth();
+            const targetDay = currentSelectedDate.getDate();
+
+            // 各種日付ラベルのテキスト更新
+            const formattedDate = `${targetYear}/${(targetMonth + 1).toString().padStart(2, '0')}/${targetDay.toString().padStart(2, '0')}`;
+            document.getElementById('target-date-display').innerText = formattedDate;
+            document.getElementById('record-title-date').innerText = `${(targetMonth + 1)}/${targetDay}`;
+
+            // 選択された日（target）に完了したタスクだけを抽出してフィルター
+            const filteredLogs = AppState.taskLogs.filter(log => {
+                const logDate = new Date(log.endTime);
+                return logDate.getFullYear() === targetYear &&
+                       logDate.getMonth() === targetMonth &&
+                       logDate.getDate() === targetDay;
+            });
+
+            // 直近5件を逆順（新しい順）で表示
+            const displayLogs = [...filteredLogs].reverse().slice(0, 5);
+
+            if (displayLogs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-400 text-xs">この日の作業記録はまだありません</td></tr>`;
+                return;
+            }
+
+            displayLogs.forEach(log => {
+                const date = new Date(log.endTime);
+                const timeString = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                
+                const hrs = Math.floor(log.durationSeconds / 3600).toString().padStart(2, '0');
+                const mins = Math.floor((log.durationSeconds % 3600) / 60).toString().padStart(2, '0');
+                const secs = (log.durationSeconds % 60).toString().padStart(2, '0');
+                const durationString = `${hrs}:${mins}:${secs}`;
+
+                const taskNameDisplay = log.taskName ? log.taskName : '名無しのタスク';
+
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-slate-50 hover:bg-slate-50 transition-colors text-xs";
+                tr.innerHTML = `
+                    <td class="py-2.5 pl-2 font-medium text-slate-700 max-w-[150px] truncate" title="${taskNameDisplay}">${taskNameDisplay}</td>
+                    <td class="py-2.5 text-slate-500">${timeString}</td>
+                    <td class="py-2.5 font-mono text-slate-600">${durationString}</td>
+                    <td class="py-2.5 pr-2 text-emerald-600 font-bold">+${log.expGained} EXP</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- 6. 経験値の獲得 ＆ レベルアップロジック ---
+        function gainExp(amount) {
+            AppState.exp += amount;
+            const nextLevelExp = 100;
+
+            if (AppState.exp >= nextLevelExp) {
+                AppState.level += Math.floor(AppState.exp / nextLevelExp);
+                AppState.exp = AppState.exp % nextLevelExp;
+                alert(`🎉 レベルアップ！ Lv.${AppState.level} になりました！`);
+            }
+
+            updateStatusUI();
+            saveStateToLocalStorage();
+        }
+
+        // --- 7. タイマー機能のロジック ---
+        let timerInterval = null;
+        let timerSecondsCount = 0;
+
+        const timerDisplay = document.getElementById('timer-display');
+        const btnStart = document.getElementById('btn-start');
+        const btnStop = document.getElementById('btn-stop');
+        const taskNameInput = document.getElementById('task-name-input');
+
+        btnStart.addEventListener('click', () => {
+            btnStart.classList.add('hidden');
+            btnStop.classList.remove('hidden');
+            
+            taskNameInput.disabled = true;
+            taskNameInput.classList.add('bg-slate-100', 'text-slate-400');
+
+            timerSecondsCount = 0;
+            timerInterval = setInterval(() => {
+                timerSecondsCount++;
+                const hrs = Math.floor(timerSecondsCount / 3600).toString().padStart(2, '0');
+                const mins = Math.floor((timerSecondsCount % 3600) / 60).toString().padStart(2, '0');
+                const secs = (timerSecondsCount % 60).toString().padStart(2, '0');
+                
+                timerDisplay.innerText = `${hrs}:${mins}:${secs}`;
+            }, 1000);
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (!timerInterval) return;
+            clearInterval(timerInterval);
+            timerInterval = null;
+
+            const durationSeconds = timerSecondsCount;
+
+            timerDisplay.innerText = "00:00:00";
+            btnStart.classList.remove('hidden');
+            btnStop.classList.add('hidden');
+            
+            taskNameInput.disabled = false;
+            taskNameInput.classList.remove('bg-slate-100', 'text-slate-400');
+
+            if (durationSeconds > 0) {
+                const expGained = durationSeconds; 
+                const currentTaskName = taskNameInput.value.trim();
+
+                // 現在カレンダーで「選択されている日付」の、今の時刻としてタイムスタンプを生成
+                const now = new Date();
+                const logTimestamp = new Date(currentSelectedDate.getTime());
+                logTimestamp.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+
+                const newLog = {
+                    id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+                    taskName: currentTaskName,
+                    startTime: new Date(logTimestamp.getTime() - (durationSeconds * 1000)).toISOString(),
+                    endTime: logTimestamp.toISOString(),
+                    durationSeconds: durationSeconds,
+                    expGained: expGained
+                };
+
+                AppState.taskLogs.push(newLog);
+                
+                // データを保存して、実績表示とカレンダー（緑のドット用）をダブル更新
+                saveStateToLocalStorage();
+                renderLogs();
+                renderCalendar();
+                gainExp(expGained);
+
+                taskNameInput.value = '';
+            }
+        });
+
+        // --- 8. AIチャットモック機能 ---
+        const chatBox = document.getElementById('chat-box');
+        const chatInput = document.getElementById('chat-input');
+        const btnSend = document.getElementById('btn-send');
+
+        function appendMessage(text, isUser = false) {
+            const msgHtml = isUser 
+                ? `<div class="bg-indigo-600 text-white p-2 rounded-2xl rounded-tr-none max-w-[85%] ml-auto text-right">${text}</div>`
+                : `<div class="bg-slate-100 text-slate-700 p-2.5 rounded-2xl rounded-tl-none max-w-[85%]">${text}</div>`;
+            chatBox.insertAdjacentHTML('beforeend', msgHtml);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        btnSend.addEventListener('click', () => {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            appendMessage(text, true);
+            chatInput.value = '';
+
+            setTimeout(() => {
+                appendMessage("カレンダーとの紐付けができましたね！次は登録したデータを美しいグラフ（可視化）にするステップに進めますよ。");
+            }, 1000);
+        });
+
+        chatInput.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') btnSend.click();
+        });
+
+        // --- 9. アプリ起動時の初期化処理 ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadStateFromLocalStorage();
+        });
+
     </script>
 </body>
 </html>
