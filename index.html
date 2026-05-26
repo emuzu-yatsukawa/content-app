@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI秘書×ゲーム感覚タスク管理アプリ</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #eef2f7;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 95vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            overflow: hidden;
+            display: flex;
+            height: 85vh;
+        }
+        .main-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e0e0e0;
+        }
+        .side-panel {
+            flex: 1;
+            background-color: #f8f9fa;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .header {
+            background-color: #4A90E2;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .chat-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #fdfdfd;
+            display: flex;
+            flex-direction: column;
+        }
+        .message {
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            max-width: 75%;
+            line-height: 1.4;
+        }
+        .ai-message {
+            background-color: #E1F5FE;
+            align-self: flex-start;
+            border-top-left-radius: 0;
+        }
+        .user-message {
+            background-color: #DCF8C6;
+            align-self: flex-end;
+            border-top-right-radius: 0;
+        }
+        .user-input-area {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #eee;
+            background: white;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+        }
+        button {
+            background-color: #4A90E2;
+            color: white;
+            border: none;
+            padding: 0 20px;
+            margin-left: 10px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background-color: #357ABD; }
+
+        .status-card {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            border-left: 5px solid #4A90E2;
+        }
+        .status-title { font-size: 0.9rem; color: #666; margin-bottom: 5px; }
+        .status-value { font-size: 1.6rem; font-weight: bold; color: #333; }
+        
+        .exp-bar-container {
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            height: 12px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .exp-bar {
+            background-color: #2ECC71;
+            width: 0%;
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        .log-list {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 0.9rem;
+            color: #555;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="main-panel">
+            <div class="header">🤖 AI秘書 タスク管理ルーム (匿名モード)</div>
+            <div class="chat-area" id="chatArea">
+                <div class="message ai-message">
+                    【本物モード起動】お疲れ様です！業務の開始や終了を教えてください。<br>
+                    例：「資料作成はじめます」「会議おわり」
+                </div>
+            </div>
+            <div class="user-input-area">
+                <input type="text" id="userInput" placeholder="メッセージを入力...">
+                <button onclick="sendMessage()">送信</button>
+            </div>
+        </div>
+
+        <div class="side-panel">
+            <div class="header" style="background-color: #2C3E50; border-radius: 8px;">📊 ステータス</div>
+            
+            <div class="status-card">
+                <div class="status-title">現在のレベル</div>
+                <div class="status-value" id="levelVal">Lv.1</div>
+                <div style="font-size: 0.8rem; color:#888; margin-top:5px;">次のレベルまで: <span id="expText">0</span> / 100 EXP</div>
+                <div class="exp-bar-container">
+                    <div class="exp-bar" id="expBar"></div>
+                </div>
+            </div>
+
+            <div class="status-card" style="border-left-color: #E67E22; flex: 1; overflow-y: auto;">
+                <div class="status-title">⏳ 本日の作業記録（リアルタイム計測）</div>
+                <ul class="log-list" id="logList">
+                    </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let level = 1;
+        let exp = 0;
+        let startTime = null; // 開始時刻を保存する変数
+        let currentTask = "";
+
+        function sendMessage() {
+            const input = document.getElementById('userInput');
+            const chatArea = document.getElementById('chatArea');
+            const text = input.value.trim();
+            
+            if (text === '') return;
+
+            appendMessage(text, 'user-message');
+            input.value = '';
+
+            setTimeout(() => {
+                let aiResponse = "";
+                const now = new Date(); // 今の時刻を取得
+
+                if (text.includes('はじめ') || text.includes('スタート') || text.includes('開始')) {
+                    // ★現実の開始時刻を記憶
+                    startTime = now;
+                    currentTask = text.replace(/はじめます|スタート|開始|します/g, "");
+                    
+                    // 時間を分かりやすく表示（例: 14:30）
+                    const timeStr = `${startTime.getHours()}:${String(startTime.getMinutes()).padStart(2, '0')}`;
+                    aiResponse = `了解しました！${timeStr} から「${currentTask}」の記録を開始します。応援しています！(＋10 EXP)`;
+                    gainExp(10);
+                } 
+                else if (text.includes('おわり') || text.includes('終了') || text.includes('完了')) {
+                    if (startTime) {
+                        const endTime = now;
+                        
+                        // ★【本物モードの時間計算】終了時刻 - 開始時刻（ミリ秒を分に変換）
+                        const diffMs = endTime - startTime;
+                        let diffMinutes = Math.floor(diffMs / 1000 / 60); 
+                        
+                        // テスト用に、1分未満（同じ分内）で終了した場合は「1分」として計算する優しい設計
+                        if (diffMinutes < 1) {
+                            diffMinutes = 1;
+                        }
+                        
+                        aiResponse = `お疲れ様でした！「${currentTask}」にかかった時間は 約 ${diffMinutes} 分でした。素晴らしい集中力です！(＋40 EXP)`;
+                        
+                        const logList = document.getElementById('logList');
+                        const li = document.createElement('li');
+                        li.innerText = `${currentTask} : ${diffMinutes}分`;
+                        logList.appendChild(li);
+
+                        startTime = null; 
+                        gainExp(40);
+                    } else {
+                        aiResponse = "おや？まだ開始のメッセージが入力されていないようです。「〇〇はじめます」と教えてください。";
+                    }
+                } 
+                else {
+                    aiResponse = "メッセージありがとうございます！業務の開始時は「〜開始」、終了時は「〜終了」と打つと、私が時間を自動で集計しますよ！(＋5 EXP)";
+                    gainExp(5);
+                }
+
+                appendMessage(aiResponse, 'ai-message');
+            }, 500);
+        }
+
+        function appendMessage(text, className) {
+            const chatArea = document.getElementById('chatArea');
+            const div = document.createElement('div');
+            div.className = `message ${className}`;
+            div.innerHTML = text;
+            chatArea.appendChild(div);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function gainExp(amount) {
+            exp += amount;
+            if (exp >= 100) {
+                level += 1;
+                exp = exp - 100;
+                alert(`🎉 レベルアップ！ Lv.${level} になりました！`);
+                appendMessage(`🎊 【SYSTEM】レベルアップ！Lv.${level} になりました。この調子で頑張りましょう！`, 'ai-message');
+            }
+            document.getElementById('levelVal').innerText = `Lv.${level}`;
+            document.getElementById('expText').innerText = exp;
+            document.getElementById('expBar').style.width = `${exp}%`;
+        }
+    </script>
+</body>
+</html>
