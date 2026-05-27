@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>社内AI活用コンペ - タスク管理アプリ</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; }
     </style>
@@ -27,7 +28,7 @@
         </div>
     </header>
 
-    <main class="flex-1 container mx-auto p-4 max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6 my-6">
+    <main class="flex-1 container mx-auto p-4 max-w-6xl my-6 grid grid-cols-1 md:grid-cols-3 gap-6">
         
         <div class="flex flex-col gap-6">
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
@@ -42,76 +43,84 @@
                     <div class="text-rose-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-indigo-500">土</div>
                 </div>
                 <div id="calendar-days" class="grid grid-cols-7 gap-1 text-center text-sm">
-                    </div>
+                </div>
             </div>
 
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[320px]">
-                <div class="p-3 border-b border-slate-100 text-xs font-bold flex items-center gap-2">
-                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>AIアシスタント
-                </div>
-                <div id="chat-box" class="flex-1 p-3 overflow-y-auto space-y-3 text-xs">
-                    <div class="bg-slate-100 text-slate-700 p-2.5 rounded-2xl rounded-tl-none max-w-[85%]">
-                        カレンダー機能が合体しました！日付を選択すると、その日の実績を瞬時に呼び出せます。実績がある日には緑のドットが点灯しますよ。
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[320px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                        📊 データの可視化
+                    </h2>
+                    <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                        <button id="tab-daily" class="px-2.5 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-xs cursor-pointer transition">本日</button>
+                        <button id="tab-weekly" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800 cursor-pointer transition">週間</button>
                     </div>
                 </div>
-                <div class="p-2 border-t border-slate-100 flex gap-1.5">
-                    <input type="text" id="chat-input" placeholder="AIに質問する..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500 transition">
-                    <button id="btn-send" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-medium hover:bg-indigo-700 transition cursor-pointer">送信</button>
+                
+                <div class="flex-1 relative flex items-center justify-center min-h-0">
+                    <div class="absolute inset-0 w-full h-full p-2">
+                        <canvas id="taskChart"></canvas>
+                    </div>
+                    <div id="no-chart-data" class="absolute inset-0 flex items-center justify-center bg-white/90 text-slate-400 text-xs font-medium hidden">
+                        この日の作業グラフはありません
+                    </div>
                 </div>
             </div>
         </div>
         
-        <div class="md:col-span-2 flex flex-col gap-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-bold flex items-center gap-2">
-                        <span class="inline-block w-2 h-4 bg-indigo-600 rounded"></span>タスクの計測
-                    </h2>
-                    <div class="flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
-                        <span>選択中の日付:</span>
-                        <span id="target-date-display">----/--/--</span>
+        <div class="md:col-span-2 grid grid-cols-1 lg:grid-cols-5 gap-6 h-fit">
+            
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2 flex flex-col justify-between min-h-[320px]">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-sm font-bold flex items-center gap-1.5">
+                            <span class="inline-block w-1.5 h-3.5 bg-indigo-600 rounded"></span>タスクの計測
+                        </h2>
+                    </div>
+                    <div class="text-center text-xs font-bold text-indigo-600 bg-indigo-50 py-1.5 rounded-full border border-indigo-100 mb-6">
+                        選択日: <span id="target-date-display">----/--/--</span>
                     </div>
                 </div>
                 
-                <div class="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-xl border border-slate-200 px-4">
-                    <div class="w-full max-w-md mb-4">
-                        <label for="task-name-input" class="block text-xs font-bold text-slate-500 mb-1">実行するタスク名</label>
-                        <input type="text" id="task-name-input" placeholder="例：コンペ資料の作成、プロトタイプ実装" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition shadow-inner">
+                <div class="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-xl border border-slate-200 px-4 flex-1">
+                    <div class="w-full mb-4">
+                        <input type="text" id="task-name-input" placeholder="タスク名を入力..." class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition shadow-inner">
                     </div>
 
-                    <div id="timer-display" class="text-5xl font-mono font-bold tracking-tight text-slate-700 mb-6">00:00:00</div>
+                    <div id="timer-display" class="text-4xl font-mono font-bold tracking-tight text-slate-700 mb-6">00:00:00</div>
                     
-                    <div class="flex gap-4">
-                        <button id="btn-start" class="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition shadow-sm active:scale-95 cursor-pointer">計測開始</button>
-                        <button id="btn-stop" class="px-6 py-2.5 bg-rose-600 text-white font-medium rounded-lg hover:bg-rose-700 transition shadow-sm active:scale-95 cursor-pointer hidden">計測終了</button>
+                    <div class="flex gap-2 w-full">
+                        <button id="btn-start" class="flex-1 py-2.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition shadow-sm active:scale-95 cursor-pointer">計測開始</button>
+                        <button id="btn-stop" class="flex-1 py-2.5 bg-rose-600 text-white text-xs font-medium rounded-lg hover:bg-rose-700 transition shadow-sm active:scale-95 cursor-pointer hidden">計測終了</button>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <span class="inline-block w-2 h-4 bg-emerald-500 rounded"></span><span id="record-title-date">選択日</span>の作業実績
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-3 flex flex-col min-h-[320px]">
+                <h2 class="text-sm font-bold mb-4 flex items-center gap-1.5">
+                    <span class="inline-block w-1.5 h-3.5 bg-emerald-500 rounded"></span><span id="record-title-date">選択日</span>の実績
                 </h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm text-slate-600">
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left text-xs text-slate-600">
                         <thead>
-                            <tr class="border-b border-slate-100 text-xs uppercase text-slate-400">
-                                <th class="py-2 pl-2">タスク名</th>
+                            <tr class="border-b border-slate-100 font-bold text-slate-400 pb-2">
+                                <th class="py-2 pl-1">タスク名</th>
                                 <th class="py-2">完了時刻</th>
                                 <th class="py-2">作業時間</th>
-                                <th class="py-2 pr-2">獲得EXP</th>
+                                <th class="py-2 pr-1 text-right">獲得EXP</th>
                             </tr>
                         </thead>
-                        <tbody id="log-table-body">
-                            </tbody>
+                        <tbody id="log-table-body" class="divide-y divide-slate-50">
+                        </tbody>
                     </table>
                 </div>
             </div>
+            
         </div>
 
     </main>
 
-    <footer class="bg-slate-100 text-center py-4 text-xs text-slate-400 border-t border-slate-200">
+    <footer class="bg-slate-100 text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-auto">
         &copy; 2026 社内AI活用コンペ開発チーム
     </footer>
 
@@ -120,20 +129,21 @@
         let AppState = {
             level: 1,
             exp: 0,
-            taskLogs: [] // { id, taskName, startTime, endTime, durationSeconds, expGained }
+            taskLogs: []
         };
 
         const STORAGE_KEY = 'ai_comp_app_state';
 
-        // 現在アプリ上で「選択されている日付」（初期値は今日）
         let currentSelectedDate = new Date();
-        // カレンダーが現在「表示している月」の基準日
         let calendarCurrentMonthDate = new Date();
+
+        // グラフ用インスタンス（1つのキャンバスを共有）
+        let globalChartInstance = null;
+        let currentGraphTab = 'daily';
 
         // --- 2. 状態管理（セーブ＆ロード） ---
         function saveStateToLocalStorage() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState));
-            console.log('データをLocalStorageに自動保存しました。', AppState);
         }
 
         function loadStateFromLocalStorage() {
@@ -141,14 +151,14 @@
             if (savedData) {
                 try {
                     AppState = JSON.parse(savedData);
-                    console.log('LocalStorageからデータを読み込みました。', AppState);
                 } catch (e) {
-                    console.error('データ読み込み失敗。初期状態から開始します。', e);
+                    console.error('データ読み込み失敗。', e);
                 }
             }
             updateStatusUI();
             renderLogs();
             renderCalendar();
+            setupTabEvents();
         }
 
         // --- 3. UI更新用の関数 ---
@@ -161,7 +171,6 @@
             document.getElementById('exp-bar').style.width = `${progressPercent}%`;
         }
 
-        // 指定した日付にログ（実績）が存在するか判定するヘルパー関数
         function hasLogsOnDate(year, month, day) {
             return AppState.taskLogs.some(log => {
                 const logDate = new Date(log.endTime);
@@ -180,68 +189,53 @@
             const year = calendarCurrentMonthDate.getFullYear();
             const month = calendarCurrentMonthDate.getMonth();
 
-            // タイトルの更新
             monthYearTitle.innerText = `${year}年 ${(month + 1)}月`;
 
-            // 月の最初の日の曜日と、月の日数を取得
             const firstDayIndex = new Date(year, month, 1).getDay();
             const totalDays = new Date(year, month + 1, 0).getDate();
 
-            // 空白のマス（前の月の余り）
             for (let i = 0; i < firstDayIndex; i++) {
                 const blank = document.createElement('div');
                 daysContainer.appendChild(blank);
             }
 
-            // 日付マスの生成
             for (let day = 1; day <= totalDays; day++) {
                 const dayBtn = document.createElement('button');
                 dayBtn.innerText = day;
                 
-                // 基本スタイル（丸型、カーソルポインタ）
-                dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-medium transition relative cursor-pointer active:scale-90";
-
-                // 選択されている日付かどうかの判定
                 const isSelected = currentSelectedDate.getFullYear() === year &&
                                    currentSelectedDate.getMonth() === month &&
                                    currentSelectedDate.getDate() === day;
 
-                // 今日かどうかの判定
                 const today = new Date();
                 const isToday = today.getFullYear() === year &&
                                 today.getMonth() === month &&
                                 today.getDate() === day;
 
                 if (isSelected) {
-                    // 選択中のスタイル（濃いインディゴ）
-                    dayBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+                    dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-bold transition relative cursor-pointer active:scale-90 bg-indigo-600 text-white shadow-sm";
                 } else if (isToday) {
-                    // 今日のスタイル（薄いインディゴの枠線）
-                    dayBtn.classList.add('border-2', 'border-indigo-600', 'text-indigo-600', 'font-bold');
+                    dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-bold transition relative cursor-pointer active:scale-90 border-2 border-indigo-600 text-indigo-600";
                 } else {
-                    // 通常のスタイル
-                    dayBtn.classList.add('text-slate-600', 'hover:bg-slate-100');
+                    dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-medium transition relative cursor-pointer active:scale-90 text-slate-600 hover:bg-slate-100";
                 }
 
-                // 【新機能】その日に実績ログデータがあれば、小さな緑のドット（・）を下に配置
                 if (hasLogsOnDate(year, month, day)) {
                     const dot = document.createElement('span');
                     dot.className = `w-1 h-1 rounded-full absolute bottom-1 ${isSelected ? 'bg-white' : 'bg-emerald-500'}`;
                     dayBtn.appendChild(dot);
                 }
 
-                // 日付クリックイベント
                 dayBtn.addEventListener('click', () => {
                     currentSelectedDate = new Date(year, month, day);
-                    renderCalendar(); // カレンダーの選択表示を更新
-                    renderLogs();     // 右側の実績リストを更新
+                    renderCalendar(); 
+                    renderLogs();     
                 });
 
                 daysContainer.appendChild(dayBtn);
             }
         }
 
-        // カレンダーの月移動ボタンのイベント
         document.getElementById('btn-prev-month').addEventListener('click', () => {
             calendarCurrentMonthDate.setMonth(calendarCurrentMonthDate.getMonth() - 1);
             renderCalendar();
@@ -252,22 +246,19 @@
         });
 
 
-        // --- 5. 実績ログの描画ロジック（選択された日付で動的にフィルター） ---
+        // --- 5. 実績ログの描画ロジック ---
         function renderLogs() {
             const tbody = document.getElementById('log-table-body');
             tbody.innerHTML = '';
 
-            // 現在選択されている年月日を取得
             const targetYear = currentSelectedDate.getFullYear();
             const targetMonth = currentSelectedDate.getMonth();
             const targetDay = currentSelectedDate.getDate();
 
-            // 各種日付ラベルのテキスト更新
             const formattedDate = `${targetYear}/${(targetMonth + 1).toString().padStart(2, '0')}/${targetDay.toString().padStart(2, '0')}`;
             document.getElementById('target-date-display').innerText = formattedDate;
             document.getElementById('record-title-date').innerText = `${(targetMonth + 1)}/${targetDay}`;
 
-            // 選択された日（target）に完了したタスクだけを抽出してフィルター
             const filteredLogs = AppState.taskLogs.filter(log => {
                 const logDate = new Date(log.endTime);
                 return logDate.getFullYear() === targetYear &&
@@ -275,11 +266,12 @@
                        logDate.getDate() === targetDay;
             });
 
-            // 直近5件を逆順（新しい順）で表示
-            const displayLogs = [...filteredLogs].reverse().slice(0, 5);
+            renderUnifiedChart(filteredLogs, currentSelectedDate);
+
+            const displayLogs = [...filteredLogs].reverse().slice(0, 5); // スペース拡大に伴い表示件数を5件に拡張
 
             if (displayLogs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-400 text-xs">この日の作業記録はまだありません</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-400 text-xs">本日記録されたタスク実績はありません</td></tr>`;
                 return;
             }
 
@@ -295,18 +287,135 @@
                 const taskNameDisplay = log.taskName ? log.taskName : '名無しのタスク';
 
                 const tr = document.createElement('tr');
-                tr.className = "border-b border-slate-50 hover:bg-slate-50 transition-colors text-xs";
+                tr.className = "hover:bg-slate-50 transition-colors text-xs text-slate-600";
                 tr.innerHTML = `
-                    <td class="py-2.5 pl-2 font-medium text-slate-700 max-w-[150px] truncate" title="${taskNameDisplay}">${taskNameDisplay}</td>
-                    <td class="py-2.5 text-slate-500">${timeString}</td>
-                    <td class="py-2.5 font-mono text-slate-600">${durationString}</td>
-                    <td class="py-2.5 pr-2 text-emerald-600 font-bold">+${log.expGained} EXP</td>
+                    <td class="py-2.5 pl-1 font-medium text-slate-700 max-w-[160px] truncate" title="${taskNameDisplay}">${taskNameDisplay}</td>
+                    <td class="py-2.5 text-slate-400">${timeString}</td>
+                    <td class="py-2.5 font-mono text-slate-500">${durationString}</td>
+                    <td class="py-2.5 pr-1 text-emerald-600 font-bold text-right">+${log.expGained}</td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        // --- 6. 経験値の獲得 ＆ レベルアップロジック ---
+        // --- 6. タブ切り替え統合グラフ描画ロジック（はみ出し修正版） ---
+        function renderUnifiedChart(dayLogs, baseDate) {
+            const ctx = document.getElementById('taskChart').getContext('2d');
+            const noDataEl = document.getElementById('no-chart-data');
+
+            if (globalChartInstance) {
+                globalChartInstance.destroy();
+            }
+
+            // 1. 本日（日別ドーナツ）の描画
+            if (currentGraphTab === 'daily') {
+                if (!dayLogs || dayLogs.length === 0) {
+                    noDataEl.classList.remove('hidden');
+                    return;
+                } else {
+                    noDataEl.classList.add('hidden');
+                }
+
+                const taskSummary = {};
+                dayLogs.forEach(log => {
+                    const name = log.taskName ? log.taskName.trim() : '名無しのタスク';
+                    const min = Math.max(1, Math.round(log.durationSeconds / 60));
+                    taskSummary[name] = (taskSummary[name] || 0) + min;
+                });
+
+                globalChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(taskSummary),
+                        datasets: [{
+                            data: Object.values(taskSummary),
+                            backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ec4899', '#3b82f6', '#8b5cf6'],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {
+                            padding: { top: 10, bottom: 10, left: 10, right: 10 } // 内側パディングではみ出し防止
+                        },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+                        }
+                    }
+                });
+
+            // 2. 週間（週間推移棒グラフ）の描画
+            } else if (currentGraphTab === 'weekly') {
+                noDataEl.classList.add('hidden');
+
+                const dateLabels = [];
+                const dateKeys = [];
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date(baseDate.getTime());
+                    d.setDate(baseDate.getDate() - i);
+                    dateLabels.push(`${d.getMonth() + 1}/${d.getDate()}`);
+                    dateKeys.push({ y: d.getFullYear(), m: d.getMonth(), d: d.getDate() });
+                }
+
+                const weeklyMinutes = new Array(7).fill(0);
+                AppState.taskLogs.forEach(log => {
+                    const logDate = new Date(log.endTime);
+                    const idx = dateKeys.findIndex(k => k.y === logDate.getFullYear() && k.m === logDate.getMonth() && k.d === logDate.getDate());
+                    if (idx !== -1) {
+                        weeklyMinutes[idx] += Math.max(1, Math.round(log.durationSeconds / 60));
+                    }
+                });
+
+                globalChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: dateLabels,
+                        datasets: [{
+                            data: weeklyMinutes,
+                            backgroundColor: 'rgba(79, 70, 229, 0.85)',
+                            hoverBackgroundColor: '#4f46e5',
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {
+                            padding: { top: 10, bottom: 5, left: 5, right: 5 }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { font: { size: 9 } }, grid: { color: '#f1f5f9' } },
+                            x: { ticks: { font: { size: 9 } }, grid: { display: false } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+
+        // --- タブボタンのクリックイベント制御 ---
+        function setupTabEvents() {
+            const tabDaily = document.getElementById('tab-daily');
+            const tabWeekly = document.getElementById('tab-weekly');
+
+            tabDaily.addEventListener('click', () => {
+                currentGraphTab = 'daily';
+                tabDaily.className = "px-2.5 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-xs cursor-pointer transition";
+                tabWeekly.className = "px-2.5 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800 cursor-pointer transition";
+                renderLogs();
+            });
+
+            tabWeekly.addEventListener('click', () => {
+                currentGraphTab = 'weekly';
+                tabWeekly.className = "px-2.5 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-xs cursor-pointer transition";
+                tabDaily.className = "px-2.5 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800 cursor-pointer transition";
+                renderLogs();
+            });
+        }
+
+        // --- 7. 経験値の獲得 ＆ レベルアップロジック ---
         function gainExp(amount) {
             AppState.exp += amount;
             const nextLevelExp = 100;
@@ -321,7 +430,7 @@
             saveStateToLocalStorage();
         }
 
-        // --- 7. タイマー機能のロジック ---
+        // --- 8. タイマー機能のロジック ---
         let timerInterval = null;
         let timerSecondsCount = 0;
 
@@ -333,7 +442,6 @@
         btnStart.addEventListener('click', () => {
             btnStart.classList.add('hidden');
             btnStop.classList.remove('hidden');
-            
             taskNameInput.disabled = true;
             taskNameInput.classList.add('bg-slate-100', 'text-slate-400');
 
@@ -343,7 +451,6 @@
                 const hrs = Math.floor(timerSecondsCount / 3600).toString().padStart(2, '0');
                 const mins = Math.floor((timerSecondsCount % 3600) / 60).toString().padStart(2, '0');
                 const secs = (timerSecondsCount % 60).toString().padStart(2, '0');
-                
                 timerDisplay.innerText = `${hrs}:${mins}:${secs}`;
             }, 1000);
         });
@@ -354,19 +461,15 @@
             timerInterval = null;
 
             const durationSeconds = timerSecondsCount;
-
             timerDisplay.innerText = "00:00:00";
             btnStart.classList.remove('hidden');
             btnStop.classList.add('hidden');
-            
             taskNameInput.disabled = false;
             taskNameInput.classList.remove('bg-slate-100', 'text-slate-400');
 
             if (durationSeconds > 0) {
                 const expGained = durationSeconds; 
                 const currentTaskName = taskNameInput.value.trim();
-
-                // 現在カレンダーで「選択されている日付」の、今の時刻としてタイムスタンプを生成
                 const now = new Date();
                 const logTimestamp = new Date(currentSelectedDate.getTime());
                 logTimestamp.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
@@ -381,43 +484,12 @@
                 };
 
                 AppState.taskLogs.push(newLog);
-                
-                // データを保存して、実績表示とカレンダー（緑のドット用）をダブル更新
                 saveStateToLocalStorage();
                 renderLogs();
                 renderCalendar();
                 gainExp(expGained);
-
                 taskNameInput.value = '';
             }
-        });
-
-        // --- 8. AIチャットモック機能 ---
-        const chatBox = document.getElementById('chat-box');
-        const chatInput = document.getElementById('chat-input');
-        const btnSend = document.getElementById('btn-send');
-
-        function appendMessage(text, isUser = false) {
-            const msgHtml = isUser 
-                ? `<div class="bg-indigo-600 text-white p-2 rounded-2xl rounded-tr-none max-w-[85%] ml-auto text-right">${text}</div>`
-                : `<div class="bg-slate-100 text-slate-700 p-2.5 rounded-2xl rounded-tl-none max-w-[85%]">${text}</div>`;
-            chatBox.insertAdjacentHTML('beforeend', msgHtml);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        btnSend.addEventListener('click', () => {
-            const text = chatInput.value.trim();
-            if (!text) return;
-            appendMessage(text, true);
-            chatInput.value = '';
-
-            setTimeout(() => {
-                appendMessage("カレンダーとの紐付けができましたね！次は登録したデータを美しいグラフ（可視化）にするステップに進めますよ。");
-            }, 1000);
-        });
-
-        chatInput.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') btnSend.click();
         });
 
         // --- 9. アプリ起動時の初期化処理 ---
