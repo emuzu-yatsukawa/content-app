@@ -8,6 +8,30 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; }
+
+        @keyframes aiPulse {
+            0% { opacity: 0.35; transform: scale(0.98); }
+            50% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0.35; transform: scale(0.98); }
+        }
+
+        @keyframes aiDots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        .ai-loading-chip {
+            animation: aiPulse 1.2s ease-in-out infinite;
+        }
+
+        .ai-loading-dots::after {
+            display: inline-block;
+            min-width: 1.2em;
+            content: '';
+            animation: aiDots 1.2s steps(1, end) infinite;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
@@ -108,12 +132,54 @@
                                 <th class="py-2">完了時刻</th>
                                 <th class="py-2">作業時間</th>
                                 <th class="py-2 pr-1 text-right">獲得EXP</th>
+                                <th class="py-2 pr-1 text-right">操作</th>
                             </tr>
                         </thead>
                         <tbody id="log-table-body" class="divide-y divide-slate-50">
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-5">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h2 class="text-sm font-bold flex items-center gap-1.5">
+                        <span class="inline-block w-1.5 h-3.5 bg-fuchsia-500 rounded"></span>AIワンボタン日報
+                    </h2>
+                    <div class="flex gap-2">
+                        <button id="btn-generate-ai-report" class="px-3 py-2 bg-fuchsia-600 text-white text-xs font-semibold rounded-lg hover:bg-fuchsia-700 transition cursor-pointer">AI日報を生成</button>
+                        <button id="btn-delete-ai-report" class="px-3 py-2 bg-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-300 transition cursor-pointer hidden">日報を削除</button>
+                    </div>
+                </div>
+
+                <div id="ai-report-loading" class="hidden bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-4 text-fuchsia-700 text-sm">
+                    <div class="ai-loading-chip inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-fuchsia-200 text-xs font-bold">
+                        <span>AI分析中</span><span class="ai-loading-dots"></span>
+                    </div>
+                    <p class="mt-3 text-xs text-fuchsia-600">選択日のタスクログから、業務要約と生産性コメントを生成しています。</p>
+                </div>
+
+                <div id="ai-report-empty" class="text-xs text-slate-400 bg-slate-50 rounded-xl p-4 border border-slate-100">
+                    この日のAI日報は未作成です。「AI日報を生成」を押すと保存されます。
+                </div>
+
+                <article id="ai-report-content" class="hidden bg-slate-50 rounded-xl p-4 border border-slate-100">
+                    <h3 id="ai-report-title" class="text-sm font-bold text-slate-700 mb-3"></h3>
+                    <div class="space-y-3 text-xs text-slate-600 leading-6">
+                        <section>
+                            <p class="font-bold text-slate-700 mb-1">業務サマリー</p>
+                            <p id="ai-report-summary"></p>
+                        </section>
+                        <section>
+                            <p class="font-bold text-slate-700 mb-1">生産性分析</p>
+                            <p id="ai-report-analysis"></p>
+                        </section>
+                        <section>
+                            <p class="font-bold text-slate-700 mb-1">翌日へのアドバイス</p>
+                            <p id="ai-report-advice"></p>
+                        </section>
+                    </div>
+                </article>
             </div>
             
         </div>
@@ -133,6 +199,8 @@
         };
 
         const STORAGE_KEY = 'ai_comp_app_state';
+        const AI_REPORTS_KEY = 'aiReports';
+        let aiReports = {};
 
         let currentSelectedDate = new Date();
         let calendarCurrentMonthDate = new Date();
@@ -155,10 +223,32 @@
                     console.error('データ読み込み失敗。', e);
                 }
             }
+
+            const savedReports = localStorage.getItem(AI_REPORTS_KEY);
+            if (savedReports) {
+                try {
+                    aiReports = JSON.parse(savedReports);
+                } catch (e) {
+                    console.error('AI日報の読み込み失敗。', e);
+                    aiReports = {};
+                }
+            }
+
             updateStatusUI();
             renderLogs();
             renderCalendar();
             setupTabEvents();
+        }
+
+        function saveAIReportsToLocalStorage() {
+            localStorage.setItem(AI_REPORTS_KEY, JSON.stringify(aiReports));
+        }
+
+        function getDateKey(date) {
+            const y = date.getFullYear();
+            const m = (date.getMonth() + 1).toString().padStart(2, '0');
+            const d = date.getDate().toString().padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
 
         // --- 3. UI更新用の関数 ---
@@ -267,11 +357,12 @@
             });
 
             renderUnifiedChart(filteredLogs, currentSelectedDate);
+            renderAIReportPanel(filteredLogs);
 
             const displayLogs = [...filteredLogs].reverse().slice(0, 5); // スペース拡大に伴い表示件数を5件に拡張
 
             if (displayLogs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-400 text-xs">本日記録されたタスク実績はありません</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 text-xs">本日記録されたタスク実績はありません</td></tr>`;
                 return;
             }
 
@@ -293,9 +384,104 @@
                     <td class="py-2.5 text-slate-400">${timeString}</td>
                     <td class="py-2.5 font-mono text-slate-500">${durationString}</td>
                     <td class="py-2.5 pr-1 text-emerald-600 font-bold text-right">+${log.expGained}</td>
+                    <td class="py-2.5 pr-1 text-right">
+                        <button data-delete-log-id="${log.id}" class="text-slate-400 hover:text-rose-600 transition cursor-pointer" title="このログを削除">🗑️</button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function renderAIReportPanel(dayLogs) {
+            const dateKey = getDateKey(currentSelectedDate);
+            const report = aiReports[dateKey];
+            const emptyEl = document.getElementById('ai-report-empty');
+            const contentEl = document.getElementById('ai-report-content');
+            const deleteBtn = document.getElementById('btn-delete-ai-report');
+
+            if (!report) {
+                emptyEl.classList.remove('hidden');
+                contentEl.classList.add('hidden');
+                deleteBtn.classList.add('hidden');
+
+                if (!dayLogs || dayLogs.length === 0) {
+                    emptyEl.innerText = 'この日はログがないため、AI日報を生成できません。まずタスク計測を記録してください。';
+                } else {
+                    emptyEl.innerText = 'この日のAI日報は未作成です。「AI日報を生成」を押すと保存されます。';
+                }
+                return;
+            }
+
+            emptyEl.classList.add('hidden');
+            contentEl.classList.remove('hidden');
+            deleteBtn.classList.remove('hidden');
+
+            const labelDate = `${currentSelectedDate.getFullYear()}年${currentSelectedDate.getMonth() + 1}月${currentSelectedDate.getDate()}日`;
+            document.getElementById('ai-report-title').innerText = `${labelDate} のAI日報`;
+            document.getElementById('ai-report-summary').innerText = report.summary;
+            document.getElementById('ai-report-analysis').innerText = report.analysis;
+            document.getElementById('ai-report-advice').innerText = report.advice;
+        }
+
+        function generateAIReportFromLogs(dayLogs) {
+            const totalSeconds = dayLogs.reduce((acc, log) => acc + (log.durationSeconds || 0), 0);
+            const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
+            const totalExp = dayLogs.reduce((acc, log) => acc + (log.expGained || 0), 0);
+
+            const taskMinutes = {};
+            dayLogs.forEach(log => {
+                const taskName = (log.taskName && log.taskName.trim()) ? log.taskName.trim() : '名無しのタスク';
+                taskMinutes[taskName] = (taskMinutes[taskName] || 0) + Math.max(1, Math.round((log.durationSeconds || 0) / 60));
+            });
+
+            const sortedTasks = Object.entries(taskMinutes).sort((a, b) => b[1] - a[1]);
+            const topTask = sortedTasks[0];
+            const taskCount = Object.keys(taskMinutes).length;
+            const focusRatio = topTask ? Math.round((topTask[1] / totalMinutes) * 100) : 0;
+
+            let workloadTone = '安定稼働';
+            if (totalMinutes >= 300) workloadTone = '高稼働';
+            if (totalMinutes <= 90) workloadTone = '軽量稼働';
+
+            const analysisPool = [
+                `主力タスク「${topTask ? topTask[0] : 'タスク'}」に${focusRatio}%の時間を投下しており、集中配分は良好です。`,
+                `タスク数は${taskCount}件で、切り替え頻度は${taskCount >= 5 ? 'やや高め' : '適切'}です。優先順位の維持が成果につながっています。`,
+                `総獲得EXPは${totalExp}で、日次の積み上げとしては${totalExp >= 3600 ? '非常に高水準' : '堅実'}です。`
+            ];
+
+            const advicePool = [
+                `明日は開始30分で最重要タスクを先行処理し、初速を作るとさらに効率が上がります。`,
+                `同種タスクを連続でまとめるブロック運用にすると、切り替えコストを圧縮できます。`,
+                `終業前に5分だけ振り返りを入れると、次日の着手がスムーズになります。`
+            ];
+
+            return {
+                summary: `${workloadTone}の1日でした。合計${totalMinutes}分の作業で${taskCount}件を処理し、主軸は「${topTask ? topTask[0] : 'タスク'}」でした。`,
+                analysis: analysisPool[Math.floor(Math.random() * analysisPool.length)],
+                advice: advicePool[Math.floor(Math.random() * advicePool.length)],
+                generatedAt: new Date().toISOString()
+            };
+        }
+
+        function deductExp(amount) {
+            const currentTotal = ((AppState.level - 1) * 100) + AppState.exp;
+            const nextTotal = Math.max(0, currentTotal - amount);
+            AppState.level = Math.floor(nextTotal / 100) + 1;
+            AppState.exp = nextTotal % 100;
+        }
+
+        function deleteLogById(logId) {
+            const index = AppState.taskLogs.findIndex(log => log.id === logId);
+            if (index === -1) return;
+
+            const removedLog = AppState.taskLogs[index];
+            AppState.taskLogs.splice(index, 1);
+            deductExp(removedLog.expGained || 0);
+
+            saveStateToLocalStorage();
+            updateStatusUI();
+            renderLogs();
+            renderCalendar();
         }
 
         // --- 6. タブ切り替え統合グラフ描画ロジック（はみ出し修正版） ---
@@ -438,6 +624,54 @@
         const btnStart = document.getElementById('btn-start');
         const btnStop = document.getElementById('btn-stop');
         const taskNameInput = document.getElementById('task-name-input');
+        const btnGenerateAIReport = document.getElementById('btn-generate-ai-report');
+        const btnDeleteAIReport = document.getElementById('btn-delete-ai-report');
+        const aiReportLoading = document.getElementById('ai-report-loading');
+
+        document.getElementById('log-table-body').addEventListener('click', (event) => {
+            const target = event.target.closest('[data-delete-log-id]');
+            if (!target) return;
+            const logId = target.getAttribute('data-delete-log-id');
+            if (!logId) return;
+            deleteLogById(logId);
+        });
+
+        btnGenerateAIReport.addEventListener('click', async () => {
+            const dateKey = getDateKey(currentSelectedDate);
+            const dayLogs = AppState.taskLogs.filter(log => {
+                const d = new Date(log.endTime);
+                return d.getFullYear() === currentSelectedDate.getFullYear() &&
+                       d.getMonth() === currentSelectedDate.getMonth() &&
+                       d.getDate() === currentSelectedDate.getDate();
+            });
+
+            if (dayLogs.length === 0) {
+                alert('この日はログがないため、AI日報を生成できません。');
+                return;
+            }
+
+            btnGenerateAIReport.disabled = true;
+            btnGenerateAIReport.classList.add('opacity-60', 'cursor-not-allowed');
+            aiReportLoading.classList.remove('hidden');
+
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            aiReports[dateKey] = generateAIReportFromLogs(dayLogs);
+            saveAIReportsToLocalStorage();
+
+            aiReportLoading.classList.add('hidden');
+            btnGenerateAIReport.disabled = false;
+            btnGenerateAIReport.classList.remove('opacity-60', 'cursor-not-allowed');
+            renderLogs();
+        });
+
+        btnDeleteAIReport.addEventListener('click', () => {
+            const dateKey = getDateKey(currentSelectedDate);
+            if (!aiReports[dateKey]) return;
+            delete aiReports[dateKey];
+            saveAIReportsToLocalStorage();
+            renderLogs();
+        });
 
         btnStart.addEventListener('click', () => {
             btnStart.classList.add('hidden');
