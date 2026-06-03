@@ -618,7 +618,7 @@
 
         // --- 8. タイマー機能のロジック ---
         let timerInterval = null;
-        let timerSecondsCount = 0;
+        let timerStartTime = null; // 開始時刻（Date.now()）を保持
 
         const timerDisplay = document.getElementById('timer-display');
         const btnStart = document.getElementById('btn-start');
@@ -679,12 +679,12 @@
             taskNameInput.disabled = true;
             taskNameInput.classList.add('bg-slate-100', 'text-slate-400');
 
-            timerSecondsCount = 0;
+            timerStartTime = Date.now();
             timerInterval = setInterval(() => {
-                timerSecondsCount++;
-                const hrs = Math.floor(timerSecondsCount / 3600).toString().padStart(2, '0');
-                const mins = Math.floor((timerSecondsCount % 3600) / 60).toString().padStart(2, '0');
-                const secs = (timerSecondsCount % 60).toString().padStart(2, '0');
+                const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
+                const hrs = Math.floor(elapsed / 3600).toString().padStart(2, '0');
+                const mins = Math.floor((elapsed % 3600) / 60).toString().padStart(2, '0');
+                const secs = (elapsed % 60).toString().padStart(2, '0');
                 timerDisplay.innerText = `${hrs}:${mins}:${secs}`;
             }, 1000);
         });
@@ -694,7 +694,8 @@
             clearInterval(timerInterval);
             timerInterval = null;
 
-            const durationSeconds = timerSecondsCount;
+            const durationSeconds = Math.floor((Date.now() - timerStartTime) / 1000);
+            timerStartTime = null;
             timerDisplay.innerText = "00:00:00";
             btnStart.classList.remove('hidden');
             btnStop.classList.add('hidden');
