@@ -253,7 +253,7 @@
 
         // --- 3. UI更新用の関数 ---
         function updateStatusUI() {
-            const nextLevelExp = 100;
+            const nextLevelExp = AppState.level * 100;
             const progressPercent = Math.min((AppState.exp / nextLevelExp) * 100, 100);
 
             document.getElementById('user-level').innerText = AppState.level;
@@ -464,10 +464,26 @@
         }
 
         function deductExp(amount) {
-            const currentTotal = ((AppState.level - 1) * 100) + AppState.exp;
+            // 現在の総EXPを計算（Lv1: 100, Lv2: 200, ... の合計）
+            let currentTotal = 0;
+            for (let i = 1; i < AppState.level; i++) {
+                currentTotal += i * 100;
+            }
+            currentTotal += AppState.exp;
+
+            // 減少後の総EXP
             const nextTotal = Math.max(0, currentTotal - amount);
-            AppState.level = Math.floor(nextTotal / 100) + 1;
-            AppState.exp = nextTotal % 100;
+
+            // 新しいレベルと経験値を計算
+            let newLevel = 1;
+            let remaining = nextTotal;
+            while (remaining >= newLevel * 100) {
+                remaining -= newLevel * 100;
+                newLevel += 1;
+            }
+
+            AppState.level = newLevel;
+            AppState.exp = remaining;
         }
 
         function deleteLogById(logId) {
@@ -604,11 +620,15 @@
         // --- 7. 経験値の獲得 ＆ レベルアップロジック ---
         function gainExp(amount) {
             AppState.exp += amount;
-            const nextLevelExp = 100;
+            let leveledUp = false;
 
-            if (AppState.exp >= nextLevelExp) {
-                AppState.level += Math.floor(AppState.exp / nextLevelExp);
-                AppState.exp = AppState.exp % nextLevelExp;
+            while (AppState.exp >= AppState.level * 100) {
+                AppState.exp -= AppState.level * 100;
+                AppState.level += 1;
+                leveledUp = true;
+            }
+
+            if (leveledUp) {
                 alert(`🎉 レベルアップ！ Lv.${AppState.level} になりました！`);
             }
 
