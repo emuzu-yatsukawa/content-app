@@ -7,23 +7,25 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; }
+        body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
 
-    <header class="bg-slate-900 text-white p-4 shadow-md">
+    <header class="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold tracking-wider">AIコンペ開発システム</h1>
+            <h1 class="text-xl font-bold tracking-wider flex items-center gap-2">
+                🚀 <span class="bg-linear-to-r from-indigo-400 to-emerald-400 bg-clip-text text-transparent">AIコンペ開発システム</span>
+            </h1>
             <div class="flex items-center gap-4">
-                <div class="bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                <div class="bg-slate-800 px-3 py-1 rounded-full border border-slate-700 flex items-center gap-1 shadow-inner">
                     <span class="text-xs text-amber-400 font-bold">Lv.</span>
-                    <span id="user-level" class="text-sm font-bold">1</span>
+                    <span id="user-level" class="text-sm font-bold text-slate-100">1</span>
                 </div>
-                <div class="w-32 bg-slate-700 h-2.5 rounded-full overflow-hidden">
-                    <div id="exp-bar" class="bg-amber-400 h-full transition-all duration-300" style="width: 0%"></div>
+                <div class="w-32 bg-slate-700 h-2.5 rounded-full overflow-hidden shadow-inner relative">
+                    <div id="exp-bar" class="bg-linear-to-r from-amber-400 to-orange-400 h-full transition-all duration-300" style="width: 0%"></div>
                 </div>
-                <span id="user-exp-text" class="text-xs text-slate-400">0 / 100 EXP</span>
+                <span id="user-exp-text" class="text-xs text-slate-400 font-mono">0 / 100 EXP</span>
             </div>
         </div>
     </header>
@@ -31,9 +33,9 @@
     <main class="flex-1 container mx-auto p-4 max-w-6xl my-6 grid grid-cols-1 md:grid-cols-3 gap-6">
         
         <div class="flex flex-col gap-6">
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/60">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 id="calendar-month-year" class="text-base font-bold text-slate-700">----年 --月</h2>
+                    <h2 id="calendar-month-year" class="text-sm font-bold text-slate-700">----年 --月</h2>
                     <div class="flex gap-1">
                         <button id="btn-prev-month" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition cursor-pointer">◀</button>
                         <button id="btn-next-month" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition cursor-pointer">▶</button>
@@ -42,11 +44,10 @@
                 <div class="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400 mb-2">
                     <div class="text-rose-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-indigo-500">土</div>
                 </div>
-                <div id="calendar-days" class="grid grid-cols-7 gap-1 text-center text-sm">
-                </div>
+                <div id="calendar-days" class="grid grid-cols-7 gap-1 text-center text-sm"></div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[320px]">
+            <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/60 flex flex-col h-[320px]">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-sm font-bold text-slate-700 flex items-center gap-1.5">
                         📊 データの可視化
@@ -70,33 +71,33 @@
         
         <div class="md:col-span-2 grid grid-cols-1 lg:grid-cols-5 gap-6 h-fit">
             
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2 flex flex-col justify-between min-h-[320px]">
+            <div class="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/60 lg:col-span-2 flex flex-col justify-between min-h-[320px]">
                 <div>
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="text-sm font-bold flex items-center gap-1.5">
                             <span class="inline-block w-1.5 h-3.5 bg-indigo-600 rounded"></span>タスクの計測
                         </h2>
                     </div>
-                    <div class="text-center text-xs font-bold text-indigo-600 bg-indigo-50 py-1.5 rounded-full border border-indigo-100 mb-6">
-                        選択日: <span id="target-date-display">----/--/--</span>
+                    <div class="text-center text-xs font-bold text-indigo-600 bg-indigo-50 py-1.5 rounded-full border border-indigo-100 mb-6 shadow-xs">
+                        表示中: <span id="target-date-display">----/--/--</span>
                     </div>
                 </div>
                 
-                <div class="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-xl border border-slate-200 px-4 flex-1">
+                <div class="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-xl border border-slate-200/80 px-4 flex-1">
                     <div class="w-full mb-4">
-                        <input type="text" id="task-name-input" placeholder="タスク名を入力..." class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition shadow-inner">
+                        <input type="text" id="task-name-input" placeholder="タスク名を入力..." class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition shadow-inner">
                     </div>
 
-                    <div id="timer-display" class="text-4xl font-mono font-bold tracking-tight text-slate-700 mb-6">00:00:00</div>
+                    <div id="timer-display" class="text-4xl font-mono font-bold tracking-tight text-slate-700 mb-6 select-none">00:00:00</div>
                     
                     <div class="flex gap-2 w-full">
-                        <button id="btn-start" class="flex-1 py-2.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition shadow-sm active:scale-95 cursor-pointer">計測開始</button>
-                        <button id="btn-stop" class="flex-1 py-2.5 bg-rose-600 text-white text-xs font-medium rounded-lg hover:bg-rose-700 transition shadow-sm active:scale-95 cursor-pointer hidden">計測終了</button>
+                        <button id="btn-start" class="flex-1 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition shadow-xs active:scale-98 cursor-pointer">計測開始</button>
+                        <button id="btn-stop" class="flex-1 py-2.5 bg-rose-600 text-white text-xs font-bold rounded-lg hover:bg-rose-700 transition shadow-xs active:scale-98 cursor-pointer hidden">計測終了</button>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-3 flex flex-col min-h-[320px]">
+            <div class="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/60 lg:col-span-3 flex flex-col min-h-[320px]">
                 <h2 class="text-sm font-bold mb-4 flex items-center gap-1.5">
                     <span class="inline-block w-1.5 h-3.5 bg-emerald-500 rounded"></span><span id="record-title-date">選択日</span>の実績
                 </h2>
@@ -104,15 +105,14 @@
                     <table class="w-full text-left text-xs text-slate-600">
                         <thead>
                             <tr class="border-b border-slate-100 font-bold text-slate-400 pb-2">
-                                <th class="py-2 pl-1">タスク名</th>
-                                <th class="py-2">完了時刻</th>
-                                <th class="py-2">作業時間</th>
-                                <th class="py-2 pr-1 text-right">獲得EXP</th>
-                                <th class="py-2 pr-1 text-right">操作</th>
+                                <th class="py-2 pl-1 w-[40%]">タスク名</th>
+                                <th class="py-2 w-[20%]">完了時刻</th>
+                                <th class="py-2 w-[20%]">作業時間</th>
+                                <th class="py-2 pr-1 w-[15%] text-right">獲得EXP</th>
+                                <th class="py-2 pr-1 w-[5%] text-right"></th>
                             </tr>
                         </thead>
-                        <tbody id="log-table-body" class="divide-y divide-slate-50">
-                        </tbody>
+                        <tbody id="log-table-body" class="divide-y divide-slate-50"></tbody>
                     </table>
                 </div>
             </div>
@@ -123,7 +123,7 @@
 
     <footer class="bg-slate-100 text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-auto flex justify-between items-center px-6">
         <div>&copy; 2026 社内AI活用コンペ開発チーム</div>
-        <button id="btn-reset-all" class="text-slate-400 hover:text-rose-500 font-medium transition cursor-pointer text-xs">⚠️ 全データを初期化</button>
+        <button id="btn-reset-all" class="text-slate-400 hover:text-rose-500 font-medium transition cursor-pointer text-xs flex items-center gap-1">⚠️ 全データを初期化</button>
     </footer>
 
     <script>
@@ -137,7 +137,6 @@
         const STORAGE_KEY = 'ai_comp_app_state';
         const EXP_BASE = 100; 
 
-        // F5リロード対策用の一時ストレージキー
         const RUNNING_TIMER_START_KEY = 'ai_comp_running_timer_start';
         const RUNNING_TIMER_NAME_KEY = 'ai_comp_running_timer_name';
         
@@ -231,7 +230,7 @@
                 const isToday = (currentLoopKey === todayKey);
 
                 if (isSelected) {
-                    dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-bold transition relative cursor-pointer active:scale-90 bg-indigo-600 text-white shadow-sm";
+                    dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-bold transition relative cursor-pointer active:scale-90 bg-indigo-600 text-white shadow-xs";
                 } else if (isToday) {
                     dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-bold transition relative cursor-pointer active:scale-90 border-2 border-indigo-600 text-indigo-600";
                 } else {
@@ -283,7 +282,7 @@
             const displayLogs = [...filteredLogs].reverse().slice(0, 5);
 
             if (displayLogs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 text-xs">本日記録されたタスク実績はありません</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 text-xs">選択された日のタスク実績はありません</td></tr>`;
                 return;
             }
 
@@ -299,14 +298,14 @@
                 const taskNameDisplay = log.taskName ? log.taskName : '名無しのタスク';
 
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition-colors text-xs text-slate-600";
+                tr.className = "hover:bg-slate-50 transition-colors text-xs text-slate-600 align-middle";
                 tr.innerHTML = `
-                    <td class="py-2.5 pl-1 font-medium text-slate-700 max-w-[160px] truncate" title="${taskNameDisplay}">${taskNameDisplay}</td>
-                    <td class="py-2.5 text-slate-400">${timeString}</td>
-                    <td class="py-2.5 font-mono text-slate-500">${durationString}</td>
-                    <td class="py-2.5 pr-1 text-emerald-600 font-bold text-right">+${log.expGained}</td>
-                    <td class="py-2.5 pr-1 text-right">
-                        <button data-delete-log-id="${log.id}" class="text-slate-400 hover:text-rose-600 transition cursor-pointer" title="このログを削除">🗑️</button>
+                    <td class="py-3 pl-1 font-medium text-slate-700 max-w-[160px] truncate" title="${taskNameDisplay}">${taskNameDisplay}</td>
+                    <td class="py-3 text-slate-400 font-mono">${timeString}</td>
+                    <td class="py-3 font-mono text-slate-500">${durationString}</td>
+                    <td class="py-3 pr-1 text-emerald-600 font-bold text-right font-mono">+${log.expGained}</td>
+                    <td class="py-3 pr-1 text-right">
+                        <button data-delete-log-id="${log.id}" class="text-slate-400 hover:text-rose-600 transition cursor-pointer p-1" title="このログを削除">🗑️</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -376,16 +375,21 @@
                 const taskSummary = {};
                 dayLogs.forEach(log => {
                     const name = log.taskName ? log.taskName.trim() : '名無しのタスク';
-                    const min = Math.max(1, Math.round(log.durationSeconds / 60));
+                    // 分単位の計算（小数点を含めることで短いタスクも反映）
+                    const min = log.durationSeconds / 60;
                     taskSummary[name] = (taskSummary[name] || 0) + min;
                 });
+
+                // グラフ表示用に小数点第1位に丸める
+                const labels = Object.keys(taskSummary);
+                const dataValues = Object.values(taskSummary).map(v => Math.round(v * 10) / 10);
 
                 globalChartInstance = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
-                        labels: Object.keys(taskSummary),
+                        labels: labels,
                         datasets: [{
-                            data: Object.values(taskSummary),
+                            data: dataValues,
                             backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ec4899', '#3b82f6', '#8b5cf6'],
                             borderWidth: 2,
                             borderColor: '#ffffff'
@@ -396,7 +400,12 @@
                         maintainAspectRatio: false,
                         layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } },
                         plugins: {
-                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) { return ` ${context.label}: ${context.raw} 分`; }
+                                }
+                            }
                         }
                     }
                 });
@@ -419,16 +428,19 @@
                     const logKey = getDateKey(logDate);
                     const idx = dateKeys.indexOf(logKey);
                     if (idx !== -1) {
-                        weeklyMinutes[idx] += Math.max(1, Math.round(log.durationSeconds / 60));
+                        weeklyMinutes[idx] += log.durationSeconds / 60;
                     }
                 });
+
+                // 丸め処理
+                const roundedWeeklyMinutes = weeklyMinutes.map(v => Math.round(v * 10) / 10);
 
                 globalChartInstance = new Chart(ctx, {
                     type: 'bar',
                     data: {
                         labels: dateLabels,
                         datasets: [{
-                            data: weeklyMinutes,
+                            data: roundedWeeklyMinutes,
                             backgroundColor: 'rgba(79, 70, 229, 0.85)',
                             hoverBackgroundColor: '#4f46e5',
                             borderRadius: 4
@@ -439,10 +451,22 @@
                         maintainAspectRatio: false,
                         layout: { padding: { top: 10, bottom: 5, left: 5, right: 5 } },
                         scales: {
-                            y: { beginAtZero: true, ticks: { font: { size: 9 } }, grid: { color: '#f1f5f9' } },
+                            y: { 
+                                beginAtZero: true, 
+                                ticks: { font: { size: 9 } }, 
+                                grid: { color: '#f1f5f9' },
+                                title: { display: true, text: '分', font: { size: 9 } }
+                            },
                             x: { ticks: { font: { size: 9 } }, grid: { display: false } }
                         },
-                        plugins: { legend: { display: false } }
+                        plugins: { 
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) { return ` 作業時間: ${context.raw} 分`; }
+                                }
+                            }
+                        }
                     }
                 });
             }
@@ -484,7 +508,7 @@
             saveStateToLocalStorage();
         }
 
-        // --- 9. タイマー機能のロジック（リロード・バリデーション対策版） ---
+        // --- 9. タイマー機能のロジック（修正版） ---
         function runTimerDisplayUpdate() {
             const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
             const hrs = Math.floor(elapsed / 3600).toString().padStart(2, '0');
@@ -556,23 +580,28 @@
 
             const expGained = durationSeconds; 
             const currentTaskName = taskNameInput.value.trim();
+            
+            // 【ブラッシュアップ】過去ログ閲覧中に計測終了しても、完了時間は「今」にする
             const now = new Date();
-            const logTimestamp = new Date(currentSelectedDate.getTime());
-            logTimestamp.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
 
             const newLog = {
                 id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
                 taskName: currentTaskName,
-                startTime: new Date(logTimestamp.getTime() - (durationSeconds * 1000)).toISOString(),
-                endTime: logTimestamp.toISOString(),
+                startTime: new Date(now.getTime() - (durationSeconds * 1000)).toISOString(),
+                endTime: now.toISOString(),
                 durationSeconds: durationSeconds,
                 expGained: expGained
             };
 
             AppState.taskLogs.push(newLog);
             saveStateToLocalStorage();
-            renderLogs();
+            
+            // 【ブラッシュアップ】記録をすぐ確認できるようにカレンダー表示を「今日」に戻す
+            currentSelectedDate = new Date();
+            calendarCurrentMonthDate = new Date();
+            
             renderCalendar();
+            renderLogs();
             gainExp(expGained);
             taskNameInput.value = '';
         });
@@ -585,7 +614,7 @@
             if (logId) deleteLogById(logId);
         });
 
-        // 全データの初期化（開発・データ詰まり対策用）
+        // 全データの初期化
         btnResetAll.addEventListener('click', () => {
             if (confirm('【注意】これまでのすべての実績ログ、レベル、データが完全に消去されます。よろしいですか？')) {
                 localStorage.clear();
@@ -599,6 +628,9 @@
                 taskNameInput.disabled = false;
                 taskNameInput.classList.remove('bg-slate-100', 'text-slate-400');
                 taskNameInput.value = '';
+
+                currentSelectedDate = new Date();
+                calendarCurrentMonthDate = new Date();
 
                 updateStatusUI();
                 renderCalendar();
