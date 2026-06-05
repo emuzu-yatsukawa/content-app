@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>社内AI活用コンペ - タスク管理アプリ</title>
+    <title>社内AI活用コンペ - タスク管理アプリ (Supabase版)</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
     </style>
@@ -15,9 +16,12 @@
     <header class="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
             <h1 class="text-xl font-bold tracking-wider flex items-center gap-2">
-                🚀 <span class="bg-linear-to-r from-indigo-400 to-emerald-400 bg-clip-text text-transparent">AIコンペ開発システム</span>
+                🚀 <span class="bg-linear-to-r from-indigo-400 to-emerald-400 bg-clip-text text-transparent">AIコンペ開発システム (Cloud)</span>
             </h1>
             <div class="flex items-center gap-4">
+                <div id="sync-indicator" class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono">
+                    接続中...
+                </div>
                 <div class="bg-slate-800 px-3 py-1 rounded-full border border-slate-700 flex items-center gap-1 shadow-inner">
                     <span class="text-xs text-amber-400 font-bold">Lv.</span>
                     <span id="user-level" class="text-sm font-bold text-slate-100">1</span>
@@ -127,6 +131,21 @@
     </footer>
 
     <script>
+        // --- [Supabase設定] ---
+        const SUPABASE_URL = 'https://hrshwvtxqzzbbghjgdjn.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc2h3dnR4cXp6YmJnaGpnZGpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjIzMTQsImV4cCI6MjA5NjEzODMxNH0.8PZI4L391dNd3LPHB2D_asX9njJZiRXyYtwTc4c8TwI'; 
+        
+        // 変数名を「supabaseClient」に変更して競合を回避します
+        // ライブラリ自体の関数は「supabase.createClient」のままで正解です
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // クライアントを識別する固定ID
+        let userId = localStorage.getItem('ai_comp_user_uuid');
+        if (!userId) {
+            userId = crypto.randomUUID ? crypto.randomUUID() : 'user_' + Date.now();
+            localStorage.setItem('ai_comp_user_uuid', userId);
+        }
+
         // --- 1. アプリ全体のデータ構造・定数 ---
         let AppState = {
             level: 1,
@@ -134,9 +153,7 @@
             taskLogs: []
         };
 
-        const STORAGE_KEY = 'ai_comp_app_state';
         const EXP_BASE = 100; 
-
         const RUNNING_TIMER_START_KEY = 'ai_comp_running_timer_start';
         const RUNNING_TIMER_NAME_KEY = 'ai_comp_running_timer_name';
         
@@ -155,16 +172,85 @@
         const btnStop = document.getElementById('btn-stop');
         const taskNameInput = document.getElementById('task-name-input');
         const btnResetAll = document.getElementById('btn-reset-all');
+        const syncIndicator = document.getElementById('sync-indicator');
 
-        // --- 2. 状態管理（セーブ＆ロード） ---
-        function saveStateToLocalStorage() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState));
+        // 同期状態の表示切り替え
+        function setSyncStatus(status) {
+            if (status === 'syncing') {
+                syncIndicator.innerText = '⚡ 同期中...';
+                syncIndicator.className = 'text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 font-mono';
+            } else if (status === 'success') {
+                syncIndicator.innerText = '☁️ クラウド同期済';
+                syncIndicator.className = 'text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono';
+            } else {
+                syncIndicator.innerText = '❌ 同期エラー';
+                syncIndicator.className = 'text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-mono';
+            }
         }
 
-        function loadStateFromLocalStorage() {
-            const savedData = localStorage.getItem(STORAGE_KEY);
-            if (savedData) {
-                try { AppState = JSON.parse(savedData); } catch (e) { console.error('データ読み込み失敗。', e); }
+        // --- 2. 状態管理（Supabase連携版セーブ＆ロード） ---
+        async function saveProfileToSupabase() {
+            setSyncStatus('syncing');
+            const { error } = await supabaseClient
+                .from('user_profiles')
+                .upsert({ 
+                    user_id: userId, 
+                    level: AppState.level, 
+                    exp: AppState.exp,
+                    updated_at: new Date().toISOString()
+                });
+            
+            if (error) {
+                console.error('プロファイル同期エラー:', error);
+                setSyncStatus('error');
+            } else {
+                setSyncStatus('success');
+            }
+        }
+
+        async function loadStateFromSupabase() {
+            setSyncStatus('syncing');
+            try {
+                // 1. レベル・EXPプロファイルのロード
+                const { data: profile, error: pError } = await supabaseClient
+                    .from('user_profiles')
+                    .select('level, exp')
+                    .eq('user_id', userId)
+                    .single();
+
+                if (pError && pError.code !== 'PGRST116') { 
+                    throw pError;
+                }
+
+                if (profile) {
+                    AppState.level = profile.level;
+                    AppState.exp = profile.exp;
+                } else {
+                    await supabaseClient.from('user_profiles').insert({ user_id: userId, level: 1, exp: 0 });
+                }
+
+                // 2. 全タスク実績ログのロード
+                const { data: logs, error: lError } = await supabaseClient
+                    .from('task_logs')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('end_time', { ascending: true });
+
+                if (lError) throw lError;
+
+                AppState.taskLogs = logs.map(log => ({
+                    id: log.id,
+                    taskName: log.task_name,
+                    startTime: log.start_time,
+                    endTime: log.end_time,
+                    durationSeconds: log.duration_seconds,
+                    expGained: log.exp_gained
+                }));
+
+                setSyncStatus('success');
+            } catch (e) {
+                console.error('Supabaseからのロードに失敗しました。', e);
+                setSyncStatus('error');
             }
 
             updateStatusUI();
@@ -331,7 +417,7 @@
             AppState.exp = currentTotal;
         }
 
-        function deductExp(amount) {
+        async function deductExp(amount) {
             let total = 0;
             for (let i = 1; i < AppState.level; i++) {
                 total += i * EXP_BASE;
@@ -339,17 +425,31 @@
             total += AppState.exp;
 
             recalculateLevelFromTotalExp(total - amount);
+            await saveProfileToSupabase();
         }
 
-        function deleteLogById(logId) {
+        async function deleteLogById(logId) {
             const index = AppState.taskLogs.findIndex(log => log.id === logId);
             if (index === -1) return;
 
+            setSyncStatus('syncing');
+            const { error } = await supabaseClient
+                .from('task_logs')
+                .delete()
+                .eq('id', logId);
+
+            if (error) {
+                console.error('Supabaseからのログ削除に失敗:', error);
+                setSyncStatus('error');
+                alert('ログの削除に失敗しました。');
+                return;
+            }
+
             const removedLog = AppState.taskLogs[index];
             AppState.taskLogs.splice(index, 1);
-            deductExp(removedLog.expGained || 0);
+            
+            await deductExp(removedLog.expGained || 0);
 
-            saveStateToLocalStorage();
             updateStatusUI();
             renderLogs();
             renderCalendar();
@@ -375,12 +475,10 @@
                 const taskSummary = {};
                 dayLogs.forEach(log => {
                     const name = log.taskName ? log.taskName.trim() : '名無しのタスク';
-                    // 分単位の計算（小数点を含めることで短いタスクも反映）
                     const min = log.durationSeconds / 60;
                     taskSummary[name] = (taskSummary[name] || 0) + min;
                 });
 
-                // グラフ表示用に小数点第1位に丸める
                 const labels = Object.keys(taskSummary);
                 const dataValues = Object.values(taskSummary).map(v => Math.round(v * 10) / 10);
 
@@ -432,7 +530,6 @@
                     }
                 });
 
-                // 丸め処理
                 const roundedWeeklyMinutes = weeklyMinutes.map(v => Math.round(v * 10) / 10);
 
                 globalChartInstance = new Chart(ctx, {
@@ -490,7 +587,7 @@
         }
 
         // --- 8. 経験値の獲得ロジック ---
-        function gainExp(amount) {
+        async function gainExp(amount) {
             AppState.exp += amount;
             let leveledUp = false;
 
@@ -500,15 +597,15 @@
                 leveledUp = true;
             }
 
+            updateStatusUI();
+            await saveProfileToSupabase();
+
             if (leveledUp) {
                 alert(`🎉 レベルアップ！ Lv.${AppState.level} になりました！`);
             }
-
-            updateStatusUI();
-            saveStateToLocalStorage();
         }
 
-        // --- 9. タイマー機能のロジック（修正版） ---
+        // --- 9. タイマー機能のロジック ---
         function runTimerDisplayUpdate() {
             const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
             const hrs = Math.floor(elapsed / 3600).toString().padStart(2, '0');
@@ -556,7 +653,7 @@
             timerInterval = setInterval(runTimerDisplayUpdate, 250);
         });
 
-        btnStop.addEventListener('click', () => {
+        btnStop.addEventListener('click', async () => {
             if (!timerInterval) return;
             clearInterval(timerInterval);
             timerInterval = null;
@@ -580,12 +677,11 @@
 
             const expGained = durationSeconds; 
             const currentTaskName = taskNameInput.value.trim();
-            
-            // 【ブラッシュアップ】過去ログ閲覧中に計測終了しても、完了時間は「今」にする
             const now = new Date();
+            const generatedId = crypto.randomUUID ? crypto.randomUUID() : 'log_' + Date.now();
 
             const newLog = {
-                id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+                id: generatedId,
                 taskName: currentTaskName,
                 startTime: new Date(now.getTime() - (durationSeconds * 1000)).toISOString(),
                 endTime: now.toISOString(),
@@ -593,20 +689,38 @@
                 expGained: expGained
             };
 
+            setSyncStatus('syncing');
+            const { error } = await supabaseClient
+                .from('task_logs')
+                .insert([{
+                    id: newLog.id,
+                    user_id: userId,
+                    task_name: newLog.taskName,
+                    start_time: newLog.startTime,
+                    end_time: newLog.endTime,
+                    duration_seconds: newLog.durationSeconds,
+                    exp_gained: newLog.expGained
+                }]);
+
+            if (error) {
+                console.error('Supabaseへのタスク保存に失敗しました:', error);
+                setSyncStatus('error');
+                alert('クラウドへのタスク保存に失敗しました。');
+                return;
+            }
+
             AppState.taskLogs.push(newLog);
-            saveStateToLocalStorage();
             
-            // 【ブラッシュアップ】記録をすぐ確認できるようにカレンダー表示を「今日」に戻す
             currentSelectedDate = new Date();
             calendarCurrentMonthDate = new Date();
             
             renderCalendar();
             renderLogs();
-            gainExp(expGained);
+            
+            await gainExp(expGained);
             taskNameInput.value = '';
         });
 
-        // ログ一覧の削除イベント受付
         document.getElementById('log-table-body').addEventListener('click', (event) => {
             const target = event.target.closest('[data-delete-log-id]');
             if (!target) return;
@@ -614,10 +728,23 @@
             if (logId) deleteLogById(logId);
         });
 
-        // 全データの初期化
-        btnResetAll.addEventListener('click', () => {
-            if (confirm('【注意】これまでのすべての実績ログ、レベル、データが完全に消去されます。よろしいですか？')) {
-                localStorage.clear();
+        btnResetAll.addEventListener('click', async () => {
+            if (confirm('【注意】クラウドに保存されているすべての実績ログ、レベル、データが完全に消去されます。よろしいですか？')) {
+                setSyncStatus('syncing');
+                
+                const { error: lError } = await supabaseClient.from('task_logs').delete().eq('user_id', userId);
+                const { error: pError } = await supabaseClient.from('user_profiles').upsert({ user_id: userId, level: 1, exp: 0 });
+
+                if (lError || pError) {
+                    console.error('初期化エラー:', lError, pError);
+                    setSyncStatus('error');
+                    alert('データの初期化中にエラーが発生しました。');
+                    return;
+                }
+
+                localStorage.removeItem(RUNNING_TIMER_START_KEY);
+                localStorage.removeItem(RUNNING_TIMER_NAME_KEY);
+                
                 AppState = { level: 1, exp: 0, taskLogs: [] };
                 timerStartTime = null;
                 if(timerInterval) clearInterval(timerInterval);
@@ -635,13 +762,14 @@
                 updateStatusUI();
                 renderCalendar();
                 renderLogs();
+                setSyncStatus('success');
                 alert('すべてのデータを初期化しました。');
             }
         });
 
         // --- 10. アプリ起動時の初期化処理 ---
-        window.addEventListener('DOMContentLoaded', () => {
-            loadStateFromLocalStorage();
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadStateFromSupabase(); 
             checkAndResumeTimer(); 
         });
 
