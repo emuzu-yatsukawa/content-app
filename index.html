@@ -8,30 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; }
-
-        @keyframes aiPulse {
-            0% { opacity: 0.35; transform: scale(0.98); }
-            50% { opacity: 1; transform: scale(1); }
-            100% { opacity: 0.35; transform: scale(0.98); }
-        }
-
-        @keyframes aiDots {
-            0%, 20% { content: ''; }
-            40% { content: '.'; }
-            60% { content: '..'; }
-            80%, 100% { content: '...'; }
-        }
-
-        .ai-loading-chip {
-            animation: aiPulse 1.2s ease-in-out infinite;
-        }
-
-        .ai-loading-dots::after {
-            display: inline-block;
-            min-width: 1.2em;
-            content: '';
-            animation: aiDots 1.2s steps(1, end) infinite;
-        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
@@ -57,7 +33,7 @@
         <div class="flex flex-col gap-6">
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 id="calendar-month-year" class="text-base font-bold text-slate-700">2026年 5月</h2>
+                    <h2 id="calendar-month-year" class="text-base font-bold text-slate-700">----年 --月</h2>
                     <div class="flex gap-1">
                         <button id="btn-prev-month" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition cursor-pointer">◀</button>
                         <button id="btn-next-month" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition cursor-pointer">▶</button>
@@ -140,58 +116,18 @@
                     </table>
                 </div>
             </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-5">
-                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                    <h2 class="text-sm font-bold flex items-center gap-1.5">
-                        <span class="inline-block w-1.5 h-3.5 bg-fuchsia-500 rounded"></span>AIワンボタン日報
-                    </h2>
-                    <div class="flex gap-2">
-                        <button id="btn-generate-ai-report" class="px-3 py-2 bg-fuchsia-600 text-white text-xs font-semibold rounded-lg hover:bg-fuchsia-700 transition cursor-pointer">AI日報を生成</button>
-                        <button id="btn-delete-ai-report" class="px-3 py-2 bg-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-300 transition cursor-pointer hidden">日報を削除</button>
-                    </div>
-                </div>
-
-                <div id="ai-report-loading" class="hidden bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-4 text-fuchsia-700 text-sm">
-                    <div class="ai-loading-chip inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-fuchsia-200 text-xs font-bold">
-                        <span>AI分析中</span><span class="ai-loading-dots"></span>
-                    </div>
-                    <p class="mt-3 text-xs text-fuchsia-600">選択日のタスクログから、業務要約と生産性コメントを生成しています。</p>
-                </div>
-
-                <div id="ai-report-empty" class="text-xs text-slate-400 bg-slate-50 rounded-xl p-4 border border-slate-100">
-                    この日のAI日報は未作成です。「AI日報を生成」を押すと保存されます。
-                </div>
-
-                <article id="ai-report-content" class="hidden bg-slate-50 rounded-xl p-4 border border-slate-100">
-                    <h3 id="ai-report-title" class="text-sm font-bold text-slate-700 mb-3"></h3>
-                    <div class="space-y-3 text-xs text-slate-600 leading-6">
-                        <section>
-                            <p class="font-bold text-slate-700 mb-1">業務サマリー</p>
-                            <p id="ai-report-summary"></p>
-                        </section>
-                        <section>
-                            <p class="font-bold text-slate-700 mb-1">生産性分析</p>
-                            <p id="ai-report-analysis"></p>
-                        </section>
-                        <section>
-                            <p class="font-bold text-slate-700 mb-1">翌日へのアドバイス</p>
-                            <p id="ai-report-advice"></p>
-                        </section>
-                    </div>
-                </article>
-            </div>
             
         </div>
 
     </main>
 
-    <footer class="bg-slate-100 text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-auto">
-        &copy; 2026 社内AI活用コンペ開発チーム
+    <footer class="bg-slate-100 text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-auto flex justify-between items-center px-6">
+        <div>&copy; 2026 社内AI活用コンペ開発チーム</div>
+        <button id="btn-reset-all" class="text-slate-400 hover:text-rose-500 font-medium transition cursor-pointer text-xs">⚠️ 全データを初期化</button>
     </footer>
 
     <script>
-        // --- 1. アプリ全体のデータ構造 ---
+        // --- 1. アプリ全体のデータ構造・定数 ---
         let AppState = {
             level: 1,
             exp: 0,
@@ -199,15 +135,27 @@
         };
 
         const STORAGE_KEY = 'ai_comp_app_state';
-        const AI_REPORTS_KEY = 'aiReports';
-        let aiReports = {};
+        const EXP_BASE = 100; 
 
+        // F5リロード対策用の一時ストレージキー
+        const RUNNING_TIMER_START_KEY = 'ai_comp_running_timer_start';
+        const RUNNING_TIMER_NAME_KEY = 'ai_comp_running_timer_name';
+        
         let currentSelectedDate = new Date();
         let calendarCurrentMonthDate = new Date();
 
-        // グラフ用インスタンス（1つのキャンバスを共有）
         let globalChartInstance = null;
         let currentGraphTab = 'daily';
+
+        let timerInterval = null;
+        let timerStartTime = null; 
+
+        // DOM要素の取得
+        const timerDisplay = document.getElementById('timer-display');
+        const btnStart = document.getElementById('btn-start');
+        const btnStop = document.getElementById('btn-stop');
+        const taskNameInput = document.getElementById('task-name-input');
+        const btnResetAll = document.getElementById('btn-reset-all');
 
         // --- 2. 状態管理（セーブ＆ロード） ---
         function saveStateToLocalStorage() {
@@ -217,31 +165,13 @@
         function loadStateFromLocalStorage() {
             const savedData = localStorage.getItem(STORAGE_KEY);
             if (savedData) {
-                try {
-                    AppState = JSON.parse(savedData);
-                } catch (e) {
-                    console.error('データ読み込み失敗。', e);
-                }
-            }
-
-            const savedReports = localStorage.getItem(AI_REPORTS_KEY);
-            if (savedReports) {
-                try {
-                    aiReports = JSON.parse(savedReports);
-                } catch (e) {
-                    console.error('AI日報の読み込み失敗。', e);
-                    aiReports = {};
-                }
+                try { AppState = JSON.parse(savedData); } catch (e) { console.error('データ読み込み失敗。', e); }
             }
 
             updateStatusUI();
             renderLogs();
             renderCalendar();
             setupTabEvents();
-        }
-
-        function saveAIReportsToLocalStorage() {
-            localStorage.setItem(AI_REPORTS_KEY, JSON.stringify(aiReports));
         }
 
         function getDateKey(date) {
@@ -251,9 +181,14 @@
             return `${y}-${m}-${d}`;
         }
 
+        function getFilteredLogsByDate(date) {
+            const targetKey = getDateKey(date);
+            return AppState.taskLogs.filter(log => getDateKey(new Date(log.endTime)) === targetKey);
+        }
+
         // --- 3. UI更新用の関数 ---
         function updateStatusUI() {
-            const nextLevelExp = AppState.level * 100;
+            const nextLevelExp = AppState.level * EXP_BASE;
             const progressPercent = Math.min((AppState.exp / nextLevelExp) * 100, 100);
 
             document.getElementById('user-level').innerText = AppState.level;
@@ -262,12 +197,8 @@
         }
 
         function hasLogsOnDate(year, month, day) {
-            return AppState.taskLogs.some(log => {
-                const logDate = new Date(log.endTime);
-                return logDate.getFullYear() === year &&
-                       logDate.getMonth() === month &&
-                       logDate.getDate() === day;
-            });
+            const checkKey = getDateKey(new Date(year, month, day));
+            return AppState.taskLogs.some(log => getDateKey(new Date(log.endTime)) === checkKey);
         }
 
         // --- 4. 動的カレンダー生成ロジック ---
@@ -285,22 +216,19 @@
             const totalDays = new Date(year, month + 1, 0).getDate();
 
             for (let i = 0; i < firstDayIndex; i++) {
-                const blank = document.createElement('div');
-                daysContainer.appendChild(blank);
+                daysContainer.appendChild(document.createElement('div'));
             }
+
+            const todayKey = getDateKey(new Date());
+            const selectedKey = getDateKey(currentSelectedDate);
 
             for (let day = 1; day <= totalDays; day++) {
                 const dayBtn = document.createElement('button');
                 dayBtn.innerText = day;
                 
-                const isSelected = currentSelectedDate.getFullYear() === year &&
-                                   currentSelectedDate.getMonth() === month &&
-                                   currentSelectedDate.getDate() === day;
-
-                const today = new Date();
-                const isToday = today.getFullYear() === year &&
-                                today.getMonth() === month &&
-                                today.getDate() === day;
+                const currentLoopKey = getDateKey(new Date(year, month, day));
+                const isSelected = (currentLoopKey === selectedKey);
+                const isToday = (currentLoopKey === todayKey);
 
                 if (isSelected) {
                     dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-bold transition relative cursor-pointer active:scale-90 bg-indigo-600 text-white shadow-sm";
@@ -335,7 +263,6 @@
             renderCalendar();
         });
 
-
         // --- 5. 実績ログの描画ロジック ---
         function renderLogs() {
             const tbody = document.getElementById('log-table-body');
@@ -349,17 +276,11 @@
             document.getElementById('target-date-display').innerText = formattedDate;
             document.getElementById('record-title-date').innerText = `${(targetMonth + 1)}/${targetDay}`;
 
-            const filteredLogs = AppState.taskLogs.filter(log => {
-                const logDate = new Date(log.endTime);
-                return logDate.getFullYear() === targetYear &&
-                       logDate.getMonth() === targetMonth &&
-                       logDate.getDate() === targetDay;
-            });
+            const filteredLogs = getFilteredLogsByDate(currentSelectedDate);
 
             renderUnifiedChart(filteredLogs, currentSelectedDate);
-            renderAIReportPanel(filteredLogs);
 
-            const displayLogs = [...filteredLogs].reverse().slice(0, 5); // スペース拡大に伴い表示件数を5件に拡張
+            const displayLogs = [...filteredLogs].reverse().slice(0, 5);
 
             if (displayLogs.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 text-xs">本日記録されたタスク実績はありません</td></tr>`;
@@ -392,98 +313,33 @@
             });
         }
 
-        function renderAIReportPanel(dayLogs) {
-            const dateKey = getDateKey(currentSelectedDate);
-            const report = aiReports[dateKey];
-            const emptyEl = document.getElementById('ai-report-empty');
-            const contentEl = document.getElementById('ai-report-content');
-            const deleteBtn = document.getElementById('btn-delete-ai-report');
-
-            if (!report) {
-                emptyEl.classList.remove('hidden');
-                contentEl.classList.add('hidden');
-                deleteBtn.classList.add('hidden');
-
-                if (!dayLogs || dayLogs.length === 0) {
-                    emptyEl.innerText = 'この日はログがないため、AI日報を生成できません。まずタスク計測を記録してください。';
+        // --- 6. 経験値＆逆算レベルアップロジック ---
+        function recalculateLevelFromTotalExp(totalExp) {
+            let currentTotal = Math.max(0, totalExp);
+            let newLevel = 1;
+            
+            while (true) {
+                const requiredExp = newLevel * EXP_BASE;
+                if (currentTotal >= requiredExp) {
+                    currentTotal -= requiredExp;
+                    newLevel++;
                 } else {
-                    emptyEl.innerText = 'この日のAI日報は未作成です。「AI日報を生成」を押すと保存されます。';
+                    break;
                 }
-                return;
             }
-
-            emptyEl.classList.add('hidden');
-            contentEl.classList.remove('hidden');
-            deleteBtn.classList.remove('hidden');
-
-            const labelDate = `${currentSelectedDate.getFullYear()}年${currentSelectedDate.getMonth() + 1}月${currentSelectedDate.getDate()}日`;
-            document.getElementById('ai-report-title').innerText = `${labelDate} のAI日報`;
-            document.getElementById('ai-report-summary').innerText = report.summary;
-            document.getElementById('ai-report-analysis').innerText = report.analysis;
-            document.getElementById('ai-report-advice').innerText = report.advice;
-        }
-
-        function generateAIReportFromLogs(dayLogs) {
-            const totalSeconds = dayLogs.reduce((acc, log) => acc + (log.durationSeconds || 0), 0);
-            const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
-            const totalExp = dayLogs.reduce((acc, log) => acc + (log.expGained || 0), 0);
-
-            const taskMinutes = {};
-            dayLogs.forEach(log => {
-                const taskName = (log.taskName && log.taskName.trim()) ? log.taskName.trim() : '名無しのタスク';
-                taskMinutes[taskName] = (taskMinutes[taskName] || 0) + Math.max(1, Math.round((log.durationSeconds || 0) / 60));
-            });
-
-            const sortedTasks = Object.entries(taskMinutes).sort((a, b) => b[1] - a[1]);
-            const topTask = sortedTasks[0];
-            const taskCount = Object.keys(taskMinutes).length;
-            const focusRatio = topTask ? Math.round((topTask[1] / totalMinutes) * 100) : 0;
-
-            let workloadTone = '安定稼働';
-            if (totalMinutes >= 300) workloadTone = '高稼働';
-            if (totalMinutes <= 90) workloadTone = '軽量稼働';
-
-            const analysisPool = [
-                `主力タスク「${topTask ? topTask[0] : 'タスク'}」に${focusRatio}%の時間を投下しており、集中配分は良好です。`,
-                `タスク数は${taskCount}件で、切り替え頻度は${taskCount >= 5 ? 'やや高め' : '適切'}です。優先順位の維持が成果につながっています。`,
-                `総獲得EXPは${totalExp}で、日次の積み上げとしては${totalExp >= 3600 ? '非常に高水準' : '堅実'}です。`
-            ];
-
-            const advicePool = [
-                `明日は開始30分で最重要タスクを先行処理し、初速を作るとさらに効率が上がります。`,
-                `同種タスクを連続でまとめるブロック運用にすると、切り替えコストを圧縮できます。`,
-                `終業前に5分だけ振り返りを入れると、次日の着手がスムーズになります。`
-            ];
-
-            return {
-                summary: `${workloadTone}の1日でした。合計${totalMinutes}分の作業で${taskCount}件を処理し、主軸は「${topTask ? topTask[0] : 'タスク'}」でした。`,
-                analysis: analysisPool[Math.floor(Math.random() * analysisPool.length)],
-                advice: advicePool[Math.floor(Math.random() * advicePool.length)],
-                generatedAt: new Date().toISOString()
-            };
+            
+            AppState.level = newLevel;
+            AppState.exp = currentTotal;
         }
 
         function deductExp(amount) {
-            // 現在の総EXPを計算（Lv1: 100, Lv2: 200, ... の合計）
-            let currentTotal = 0;
+            let total = 0;
             for (let i = 1; i < AppState.level; i++) {
-                currentTotal += i * 100;
+                total += i * EXP_BASE;
             }
-            currentTotal += AppState.exp;
+            total += AppState.exp;
 
-            // 減少後の総EXP
-            const nextTotal = Math.max(0, currentTotal - amount);
-
-            // 新しいレベルと経験値を計算
-            let newLevel = 1;
-            let remaining = nextTotal;
-            while (remaining >= newLevel * 100) {
-                remaining -= newLevel * 100;
-                newLevel += 1;
-            }
-
-            AppState.level = newLevel;
-            AppState.exp = remaining;
+            recalculateLevelFromTotalExp(total - amount);
         }
 
         function deleteLogById(logId) {
@@ -500,7 +356,7 @@
             renderCalendar();
         }
 
-        // --- 6. タブ切り替え統合グラフ描画ロジック（はみ出し修正版） ---
+        // --- 7. タブ切り替え統合グラフ描画ロジック ---
         function renderUnifiedChart(dayLogs, baseDate) {
             const ctx = document.getElementById('taskChart').getContext('2d');
             const noDataEl = document.getElementById('no-chart-data');
@@ -509,7 +365,6 @@
                 globalChartInstance.destroy();
             }
 
-            // 1. 本日（日別ドーナツ）の描画
             if (currentGraphTab === 'daily') {
                 if (!dayLogs || dayLogs.length === 0) {
                     noDataEl.classList.remove('hidden');
@@ -539,16 +394,13 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        layout: {
-                            padding: { top: 10, bottom: 10, left: 10, right: 10 } // 内側パディングではみ出し防止
-                        },
+                        layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } },
                         plugins: {
                             legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
                         }
                     }
                 });
 
-            // 2. 週間（週間推移棒グラフ）の描画
             } else if (currentGraphTab === 'weekly') {
                 noDataEl.classList.add('hidden');
 
@@ -558,13 +410,14 @@
                     const d = new Date(baseDate.getTime());
                     d.setDate(baseDate.getDate() - i);
                     dateLabels.push(`${d.getMonth() + 1}/${d.getDate()}`);
-                    dateKeys.push({ y: d.getFullYear(), m: d.getMonth(), d: d.getDate() });
+                    dateKeys.push(getDateKey(d));
                 }
 
                 const weeklyMinutes = new Array(7).fill(0);
                 AppState.taskLogs.forEach(log => {
                     const logDate = new Date(log.endTime);
-                    const idx = dateKeys.findIndex(k => k.y === logDate.getFullYear() && k.m === logDate.getMonth() && k.d === logDate.getDate());
+                    const logKey = getDateKey(logDate);
+                    const idx = dateKeys.indexOf(logKey);
                     if (idx !== -1) {
                         weeklyMinutes[idx] += Math.max(1, Math.round(log.durationSeconds / 60));
                     }
@@ -584,9 +437,7 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        layout: {
-                            padding: { top: 10, bottom: 5, left: 5, right: 5 }
-                        },
+                        layout: { padding: { top: 10, bottom: 5, left: 5, right: 5 } },
                         scales: {
                             y: { beginAtZero: true, ticks: { font: { size: 9 } }, grid: { color: '#f1f5f9' } },
                             x: { ticks: { font: { size: 9 } }, grid: { display: false } }
@@ -597,33 +448,30 @@
             }
         }
 
-        // --- タブボタンのクリックイベント制御 ---
         function setupTabEvents() {
             const tabDaily = document.getElementById('tab-daily');
             const tabWeekly = document.getElementById('tab-weekly');
+            const activeClass = "px-2.5 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-xs cursor-pointer transition";
+            const inactiveClass = "px-2.5 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800 cursor-pointer transition";
 
-            tabDaily.addEventListener('click', () => {
-                currentGraphTab = 'daily';
-                tabDaily.className = "px-2.5 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-xs cursor-pointer transition";
-                tabWeekly.className = "px-2.5 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800 cursor-pointer transition";
+            const switchTab = (tab) => {
+                currentGraphTab = tab;
+                tabDaily.className = tab === 'daily' ? activeClass : inactiveClass;
+                tabWeekly.className = tab === 'weekly' ? activeClass : inactiveClass;
                 renderLogs();
-            });
+            };
 
-            tabWeekly.addEventListener('click', () => {
-                currentGraphTab = 'weekly';
-                tabWeekly.className = "px-2.5 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-xs cursor-pointer transition";
-                tabDaily.className = "px-2.5 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800 cursor-pointer transition";
-                renderLogs();
-            });
+            tabDaily.addEventListener('click', () => switchTab('daily'));
+            tabWeekly.addEventListener('click', () => switchTab('weekly'));
         }
 
-        // --- 7. 経験値の獲得 ＆ レベルアップロジック ---
+        // --- 8. 経験値の獲得ロジック ---
         function gainExp(amount) {
             AppState.exp += amount;
             let leveledUp = false;
 
-            while (AppState.exp >= AppState.level * 100) {
-                AppState.exp -= AppState.level * 100;
+            while (AppState.exp >= AppState.level * EXP_BASE) {
+                AppState.exp -= AppState.level * EXP_BASE;
                 AppState.level += 1;
                 leveledUp = true;
             }
@@ -636,77 +484,52 @@
             saveStateToLocalStorage();
         }
 
-        // --- 8. タイマー機能のロジック ---
-        let timerInterval = null;
-        let timerStartTime = null; // 開始時刻（Date.now()）を保持
+        // --- 9. タイマー機能のロジック（リロード・バリデーション対策版） ---
+        function runTimerDisplayUpdate() {
+            const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
+            const hrs = Math.floor(elapsed / 3600).toString().padStart(2, '0');
+            const mins = Math.floor((elapsed % 3600) / 60).toString().padStart(2, '0');
+            const secs = (elapsed % 60).toString().padStart(2, '0');
+            timerDisplay.innerText = `${hrs}:${mins}:${secs}`;
+        }
 
-        const timerDisplay = document.getElementById('timer-display');
-        const btnStart = document.getElementById('btn-start');
-        const btnStop = document.getElementById('btn-stop');
-        const taskNameInput = document.getElementById('task-name-input');
-        const btnGenerateAIReport = document.getElementById('btn-generate-ai-report');
-        const btnDeleteAIReport = document.getElementById('btn-delete-ai-report');
-        const aiReportLoading = document.getElementById('ai-report-loading');
+        function checkAndResumeTimer() {
+            const savedStartTime = localStorage.getItem(RUNNING_TIMER_START_KEY);
+            const savedTaskName = localStorage.getItem(RUNNING_TIMER_NAME_KEY);
 
-        document.getElementById('log-table-body').addEventListener('click', (event) => {
-            const target = event.target.closest('[data-delete-log-id]');
-            if (!target) return;
-            const logId = target.getAttribute('data-delete-log-id');
-            if (!logId) return;
-            deleteLogById(logId);
-        });
+            if (savedStartTime) {
+                timerStartTime = parseInt(savedStartTime, 10);
+                taskNameInput.value = savedTaskName || '';
 
-        btnGenerateAIReport.addEventListener('click', async () => {
-            const dateKey = getDateKey(currentSelectedDate);
-            const dayLogs = AppState.taskLogs.filter(log => {
-                const d = new Date(log.endTime);
-                return d.getFullYear() === currentSelectedDate.getFullYear() &&
-                       d.getMonth() === currentSelectedDate.getMonth() &&
-                       d.getDate() === currentSelectedDate.getDate();
-            });
+                btnStart.classList.add('hidden');
+                btnStop.classList.remove('hidden');
+                taskNameInput.disabled = true;
+                taskNameInput.classList.add('bg-slate-100', 'text-slate-400');
 
-            if (dayLogs.length === 0) {
-                alert('この日はログがないため、AI日報を生成できません。');
+                runTimerDisplayUpdate();
+                timerInterval = setInterval(runTimerDisplayUpdate, 250);
+            }
+        }
+
+        btnStart.addEventListener('click', () => {
+            const currentTaskName = taskNameInput.value.trim();
+            
+            if (!currentTaskName) {
+                alert('計測を開始するにはタスク名を入力してください。');
                 return;
             }
 
-            btnGenerateAIReport.disabled = true;
-            btnGenerateAIReport.classList.add('opacity-60', 'cursor-not-allowed');
-            aiReportLoading.classList.remove('hidden');
-
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            aiReports[dateKey] = generateAIReportFromLogs(dayLogs);
-            saveAIReportsToLocalStorage();
-
-            aiReportLoading.classList.add('hidden');
-            btnGenerateAIReport.disabled = false;
-            btnGenerateAIReport.classList.remove('opacity-60', 'cursor-not-allowed');
-            renderLogs();
-        });
-
-        btnDeleteAIReport.addEventListener('click', () => {
-            const dateKey = getDateKey(currentSelectedDate);
-            if (!aiReports[dateKey]) return;
-            delete aiReports[dateKey];
-            saveAIReportsToLocalStorage();
-            renderLogs();
-        });
-
-        btnStart.addEventListener('click', () => {
             btnStart.classList.add('hidden');
             btnStop.classList.remove('hidden');
             taskNameInput.disabled = true;
             taskNameInput.classList.add('bg-slate-100', 'text-slate-400');
 
             timerStartTime = Date.now();
-            timerInterval = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
-                const hrs = Math.floor(elapsed / 3600).toString().padStart(2, '0');
-                const mins = Math.floor((elapsed % 3600) / 60).toString().padStart(2, '0');
-                const secs = (elapsed % 60).toString().padStart(2, '0');
-                timerDisplay.innerText = `${hrs}:${mins}:${secs}`;
-            }, 1000);
+            
+            localStorage.setItem(RUNNING_TIMER_START_KEY, timerStartTime.toString());
+            localStorage.setItem(RUNNING_TIMER_NAME_KEY, currentTaskName);
+
+            timerInterval = setInterval(runTimerDisplayUpdate, 250);
         });
 
         btnStop.addEventListener('click', () => {
@@ -722,34 +545,72 @@
             taskNameInput.disabled = false;
             taskNameInput.classList.remove('bg-slate-100', 'text-slate-400');
 
-            if (durationSeconds > 0) {
-                const expGained = durationSeconds; 
-                const currentTaskName = taskNameInput.value.trim();
-                const now = new Date();
-                const logTimestamp = new Date(currentSelectedDate.getTime());
-                logTimestamp.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+            localStorage.removeItem(RUNNING_TIMER_START_KEY);
+            localStorage.removeItem(RUNNING_TIMER_NAME_KEY);
 
-                const newLog = {
-                    id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
-                    taskName: currentTaskName,
-                    startTime: new Date(logTimestamp.getTime() - (durationSeconds * 1000)).toISOString(),
-                    endTime: logTimestamp.toISOString(),
-                    durationSeconds: durationSeconds,
-                    expGained: expGained
-                };
-
-                AppState.taskLogs.push(newLog);
-                saveStateToLocalStorage();
-                renderLogs();
-                renderCalendar();
-                gainExp(expGained);
+            if (durationSeconds < 5) {
+                alert('計測時間が5秒未満のため、実績ログには記録されませんでした。');
                 taskNameInput.value = '';
+                return;
+            }
+
+            const expGained = durationSeconds; 
+            const currentTaskName = taskNameInput.value.trim();
+            const now = new Date();
+            const logTimestamp = new Date(currentSelectedDate.getTime());
+            logTimestamp.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+
+            const newLog = {
+                id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+                taskName: currentTaskName,
+                startTime: new Date(logTimestamp.getTime() - (durationSeconds * 1000)).toISOString(),
+                endTime: logTimestamp.toISOString(),
+                durationSeconds: durationSeconds,
+                expGained: expGained
+            };
+
+            AppState.taskLogs.push(newLog);
+            saveStateToLocalStorage();
+            renderLogs();
+            renderCalendar();
+            gainExp(expGained);
+            taskNameInput.value = '';
+        });
+
+        // ログ一覧の削除イベント受付
+        document.getElementById('log-table-body').addEventListener('click', (event) => {
+            const target = event.target.closest('[data-delete-log-id]');
+            if (!target) return;
+            const logId = target.getAttribute('data-delete-log-id');
+            if (logId) deleteLogById(logId);
+        });
+
+        // 全データの初期化（開発・データ詰まり対策用）
+        btnResetAll.addEventListener('click', () => {
+            if (confirm('【注意】これまでのすべての実績ログ、レベル、データが完全に消去されます。よろしいですか？')) {
+                localStorage.clear();
+                AppState = { level: 1, exp: 0, taskLogs: [] };
+                timerStartTime = null;
+                if(timerInterval) clearInterval(timerInterval);
+                timerDisplay.innerText = "00:00:00";
+                
+                btnStart.classList.remove('hidden');
+                btnStop.classList.add('hidden');
+                taskNameInput.disabled = false;
+                taskNameInput.classList.remove('bg-slate-100', 'text-slate-400');
+                taskNameInput.value = '';
+
+                updateStatusUI();
+                renderCalendar();
+                renderLogs();
+                alert('すべてのデータを初期化しました。');
             }
         });
 
-        // --- 9. アプリ起動時の初期化処理 ---
+        // --- 10. アプリ起動時の初期化処理 ---
         window.addEventListener('DOMContentLoaded', () => {
             loadStateFromLocalStorage();
+            checkAndResumeTimer(); 
         });
 
     </script>
