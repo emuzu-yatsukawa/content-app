@@ -3,65 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>社内AI活用コンペ - タスク管理アプリ (認証付きSupabase版)</title>
+    <title>社内AI活用コンペ - タスク管理アプリ</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; }
+
+        @keyframes aiPulse {
+            0% { opacity: 0.35; transform: scale(0.98); }
+            50% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0.35; transform: scale(0.98); }
+        }
+
+        @keyframes aiDots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        .ai-loading-chip {
+            animation: aiPulse 1.2s ease-in-out infinite;
+        }
+
+        .ai-loading-dots::after {
+            display: inline-block;
+            min-width: 1.2em;
+            content: '';
+            animation: aiDots 1.2s steps(1, end) infinite;
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-    <div id="auth-overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-100 flex items-center justify-center p-4 hidden">
-        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-slate-200 w-full max-w-md">
-            <h2 id="auth-title" class="text-xl font-bold text-slate-800 mb-2">🚀 AIコンペ開発システムへログイン</h2>
-            <p id="auth-subtitle" class="text-xs text-slate-400 mb-6">メールアドレスとパスワードを入力してください。</p>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">メールアドレス</label>
-                    <input type="email" id="auth-email" placeholder="example@company.com" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">パスワード</label>
-                    <input type="password" id="auth-password" placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
-                </div>
-                
-                <button id="btn-auth-primary" class="w-full py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition cursor-pointer active:scale-98">
-                    ログインする
-                </button>
-                
-                <div class="text-center pt-2">
-                    <button id="btn-auth-toggle" class="text-xs text-indigo-600 hover:underline font-medium cursor-pointer">
-                        初めての方はこちら（新規アカウント登録）
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <header class="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-50">
+    <header class="bg-slate-900 text-white p-4 shadow-md">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold tracking-wider flex items-center gap-2">
-                🚀 <span class="bg-linear-to-r from-indigo-400 to-emerald-400 bg-clip-text text-transparent">AIコンペ開発システム (Cloud)</span>
-            </h1>
+            <h1 class="text-xl font-bold tracking-wider">AIコンペ開発システム</h1>
             <div class="flex items-center gap-4">
-                <div id="sync-indicator" class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono">
-                    接続中...
-                </div>
-                
-                <span id="user-email-display" class="text-xs text-slate-400 hidden max-w-[150px] truncate">---</span>
-                <button id="btn-logout" class="text-xs bg-slate-800 border border-slate-700 text-slate-300 px-2 py-1 rounded-md hover:bg-slate-700 transition cursor-pointer hidden">ログアウト</button>
-
-                <div class="bg-slate-800 px-3 py-1 rounded-full border border-slate-700 flex items-center gap-1 shadow-inner">
+                <div class="bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
                     <span class="text-xs text-amber-400 font-bold">Lv.</span>
-                    <span id="user-level" class="text-sm font-bold text-slate-100">1</span>
+                    <span id="user-level" class="text-sm font-bold">1</span>
                 </div>
-                <div class="w-32 bg-slate-700 h-2.5 rounded-full overflow-hidden shadow-inner relative">
-                    <div id="exp-bar" class="bg-linear-to-r from-amber-400 to-orange-400 h-full transition-all duration-300" style="width: 0%"></div>
+                <div class="w-32 bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                    <div id="exp-bar" class="bg-amber-400 h-full transition-all duration-300" style="width: 0%"></div>
                 </div>
-                <span id="user-exp-text" class="text-xs text-slate-400 font-mono">0 / 100 EXP</span>
+                <span id="user-exp-text" class="text-xs text-slate-400">0 / 100 EXP</span>
             </div>
         </div>
     </header>
@@ -69,9 +55,9 @@
     <main class="flex-1 container mx-auto p-4 max-w-6xl my-6 grid grid-cols-1 md:grid-cols-3 gap-6">
         
         <div class="flex flex-col gap-6">
-            <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/60">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 id="calendar-month-year" class="text-sm font-bold text-slate-700">----年 --月</h2>
+                    <h2 id="calendar-month-year" class="text-base font-bold text-slate-700">2026年 5月</h2>
                     <div class="flex gap-1">
                         <button id="btn-prev-month" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition cursor-pointer">◀</button>
                         <button id="btn-next-month" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition cursor-pointer">▶</button>
@@ -80,10 +66,11 @@
                 <div class="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400 mb-2">
                     <div class="text-rose-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-indigo-500">土</div>
                 </div>
-                <div id="calendar-days" class="grid grid-cols-7 gap-1 text-center text-sm"></div>
+                <div id="calendar-days" class="grid grid-cols-7 gap-1 text-center text-sm">
+                </div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/60 flex flex-col h-[320px]">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[320px]">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-sm font-bold text-slate-700 flex items-center gap-1.5">
                         📊 データの可視化
@@ -107,33 +94,33 @@
         
         <div class="md:col-span-2 grid grid-cols-1 lg:grid-cols-5 gap-6 h-fit">
             
-            <div class="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/60 lg:col-span-2 flex flex-col justify-between min-h-[320px]">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2 flex flex-col justify-between min-h-[320px]">
                 <div>
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="text-sm font-bold flex items-center gap-1.5">
                             <span class="inline-block w-1.5 h-3.5 bg-indigo-600 rounded"></span>タスクの計測
                         </h2>
                     </div>
-                    <div class="text-center text-xs font-bold text-indigo-600 bg-indigo-50 py-1.5 rounded-full border border-indigo-100 mb-6 shadow-xs">
-                        表示中: <span id="target-date-display">----/--/--</span>
+                    <div class="text-center text-xs font-bold text-indigo-600 bg-indigo-50 py-1.5 rounded-full border border-indigo-100 mb-6">
+                        選択日: <span id="target-date-display">----/--/--</span>
                     </div>
                 </div>
                 
-                <div class="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-xl border border-slate-200/80 px-4 flex-1">
+                <div class="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-xl border border-slate-200 px-4 flex-1">
                     <div class="w-full mb-4">
-                        <input type="text" id="task-name-input" placeholder="タスク名を入力..." class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition shadow-inner">
+                        <input type="text" id="task-name-input" placeholder="タスク名を入力..." class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition shadow-inner">
                     </div>
 
-                    <div id="timer-display" class="text-4xl font-mono font-bold tracking-tight text-slate-700 mb-6 select-none">00:00:00</div>
+                    <div id="timer-display" class="text-4xl font-mono font-bold tracking-tight text-slate-700 mb-6">00:00:00</div>
                     
                     <div class="flex gap-2 w-full">
-                        <button id="btn-start" class="flex-1 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition shadow-xs active:scale-98 cursor-pointer">計測開始</button>
-                        <button id="btn-stop" class="flex-1 py-2.5 bg-rose-600 text-white text-xs font-bold rounded-lg hover:bg-rose-700 transition shadow-xs active:scale-98 cursor-pointer hidden">計測終了</button>
+                        <button id="btn-start" class="flex-1 py-2.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition shadow-sm active:scale-95 cursor-pointer">計測開始</button>
+                        <button id="btn-stop" class="flex-1 py-2.5 bg-rose-600 text-white text-xs font-medium rounded-lg hover:bg-rose-700 transition shadow-sm active:scale-95 cursor-pointer hidden">計測終了</button>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/60 lg:col-span-3 flex flex-col min-h-[320px]">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-3 flex flex-col min-h-[320px]">
                 <h2 class="text-sm font-bold mb-4 flex items-center gap-1.5">
                     <span class="inline-block w-1.5 h-3.5 bg-emerald-500 rounded"></span><span id="record-title-date">選択日</span>の実績
                 </h2>
@@ -141,16 +128,58 @@
                     <table class="w-full text-left text-xs text-slate-600">
                         <thead>
                             <tr class="border-b border-slate-100 font-bold text-slate-400 pb-2">
-                                <th class="py-2 pl-1 w-[40%]">タスク名</th>
-                                <th class="py-2 w-[20%]">完了時刻</th>
-                                <th class="py-2 w-[20%]">作業時間</th>
-                                <th class="py-2 pr-1 w-[15%] text-right">獲得EXP</th>
-                                <th class="py-2 pr-1 w-[5%] text-right"></th>
+                                <th class="py-2 pl-1">タスク名</th>
+                                <th class="py-2">完了時刻</th>
+                                <th class="py-2">作業時間</th>
+                                <th class="py-2 pr-1 text-right">獲得EXP</th>
+                                <th class="py-2 pr-1 text-right">操作</th>
                             </tr>
                         </thead>
-                        <tbody id="log-table-body" class="divide-y divide-slate-50"></tbody>
+                        <tbody id="log-table-body" class="divide-y divide-slate-50">
+                        </tbody>
                     </table>
                 </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-5">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h2 class="text-sm font-bold flex items-center gap-1.5">
+                        <span class="inline-block w-1.5 h-3.5 bg-fuchsia-500 rounded"></span>AIワンボタン日報
+                    </h2>
+                    <div class="flex gap-2">
+                        <button id="btn-generate-ai-report" class="px-3 py-2 bg-fuchsia-600 text-white text-xs font-semibold rounded-lg hover:bg-fuchsia-700 transition cursor-pointer">AI日報を生成</button>
+                        <button id="btn-delete-ai-report" class="px-3 py-2 bg-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-300 transition cursor-pointer hidden">日報を削除</button>
+                    </div>
+                </div>
+
+                <div id="ai-report-loading" class="hidden bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-4 text-fuchsia-700 text-sm">
+                    <div class="ai-loading-chip inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-fuchsia-200 text-xs font-bold">
+                        <span>AI分析中</span><span class="ai-loading-dots"></span>
+                    </div>
+                    <p class="mt-3 text-xs text-fuchsia-600">選択日のタスクログから、業務要約と生産性コメントを生成しています。</p>
+                </div>
+
+                <div id="ai-report-empty" class="text-xs text-slate-400 bg-slate-50 rounded-xl p-4 border border-slate-100">
+                    この日のAI日報は未作成です。「AI日報を生成」を押すと保存されます。
+                </div>
+
+                <article id="ai-report-content" class="hidden bg-slate-50 rounded-xl p-4 border border-slate-100">
+                    <h3 id="ai-report-title" class="text-sm font-bold text-slate-700 mb-3"></h3>
+                    <div class="space-y-3 text-xs text-slate-600 leading-6">
+                        <section>
+                            <p class="font-bold text-slate-700 mb-1">業務サマリー</p>
+                            <p id="ai-report-summary"></p>
+                        </section>
+                        <section>
+                            <p class="font-bold text-slate-700 mb-1">生産性分析</p>
+                            <p id="ai-report-analysis"></p>
+                        </section>
+                        <section>
+                            <p class="font-bold text-slate-700 mb-1">翌日へのアドバイス</p>
+                            <p id="ai-report-advice"></p>
+                        </section>
+                    </div>
+                </article>
             </div>
             
         </div>
@@ -159,18 +188,10 @@
 
     <footer class="bg-slate-100 text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-auto flex justify-between items-center px-6">
         <div>&copy; 2026 社内AI活用コンペ開発チーム</div>
-        <button id="btn-reset-all" class="text-slate-400 hover:text-rose-500 font-medium transition cursor-pointer text-xs flex items-center gap-1">⚠️ 全データを初期化</button>
+        <button id="btn-reset-all" class="text-slate-400 hover:text-rose-500 font-medium transition cursor-pointer text-xs">⚠️ 全データを初期化</button>
     </footer>
 
     <script>
-        // --- [Supabase設定] ---
-        const SUPABASE_URL = 'https://hrshwvtxqzzbbghjgdjn.supabase.co'; 
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc2h3dnR4cXp6YmJnaGpnZGpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjIzMTQsImV4cCI6MjA5NjEzODMxNH0.8PZI4L391dNd3LPHB2D_asX9njJZiRXyYtwTc4c8TwI'; 
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        // ログインしたユーザーの一意なID（初期状態はnull）
-        let userId = null;
-
         // --- 1. アプリ全体のデータ構造・定数 ---
         let AppState = {
             level: 1,
@@ -178,10 +199,15 @@
             taskLogs: []
         };
 
+        const STORAGE_KEY = 'ai_comp_app_state';
+        const AI_REPORTS_KEY = 'aiReports';
         const EXP_BASE = 100; 
+
+        // F5リロード対策用の一時ストレージキー
         const RUNNING_TIMER_START_KEY = 'ai_comp_running_timer_start';
         const RUNNING_TIMER_NAME_KEY = 'ai_comp_running_timer_name';
         
+        let aiReports = {};
         let currentSelectedDate = new Date();
         let calendarCurrentMonthDate = new Date();
 
@@ -196,185 +222,35 @@
         const btnStart = document.getElementById('btn-start');
         const btnStop = document.getElementById('btn-stop');
         const taskNameInput = document.getElementById('task-name-input');
+        const btnGenerateAIReport = document.getElementById('btn-generate-ai-report');
+        const btnDeleteAIReport = document.getElementById('btn-delete-ai-report');
+        const aiReportLoading = document.getElementById('ai-report-loading');
         const btnResetAll = document.getElementById('btn-reset-all');
-        const syncIndicator = document.getElementById('sync-indicator');
 
-        // 認証関連DOM要素の取得
-        const authOverlay = document.getElementById('auth-overlay');
-        const authTitle = document.getElementById('auth-title');
-        const authSubtitle = document.getElementById('auth-subtitle');
-        const authEmail = document.getElementById('auth-email');
-        const authPassword = document.getElementById('auth-password');
-        const btnAuthPrimary = document.getElementById('btn-auth-primary');
-        const btnAuthToggle = document.getElementById('btn-auth-toggle');
-        const btnLogout = document.getElementById('btn-logout');
-        const userEmailDisplay = document.getElementById('user-email-display');
-
-        let isSignUpMode = false; // ログイン画面と新規登録画面の切り替えフラグ
-
-        // 同期状態の表示切り替え
-        function setSyncStatus(status) {
-            if (status === 'syncing') {
-                syncIndicator.innerText = '⚡ 同期中...';
-                syncIndicator.className = 'text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 font-mono';
-            } else if (status === 'success') {
-                syncIndicator.innerText = '☁️ クラウド同期済';
-                syncIndicator.className = 'text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono';
-            } else {
-                syncIndicator.innerText = '❌ 同期エラー';
-                syncIndicator.className = 'text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-mono';
-            }
+        // --- 2. 状態管理（セーブ＆ロード） ---
+        function saveStateToLocalStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState));
         }
 
-        // --- 🔑 認証（Auth）制御ロジック ---
-        function handleAuthStateChange(session) {
-            if (session && session.user) {
-                userId = session.user.id;
-                userEmailDisplay.innerText = session.user.email;
-                userEmailDisplay.classList.remove('hidden');
-                btnLogout.classList.remove('hidden');
-                authOverlay.classList.add('hidden'); // ログイン成功時に画面を解放
-                loadStateFromSupabase();
-            } else {
-                userId = null;
-                userEmailDisplay.classList.add('hidden');
-                btnLogout.classList.add('hidden');
-                authOverlay.classList.remove('hidden'); // 未ログイン時はモーダルを強制表示
-                setSyncStatus('error');
-            }
-        }
-
-        // ログイン ⇄ 新規登録 のUI切り替えボタン
-        btnAuthToggle.addEventListener('click', () => {
-            isSignUpMode = !isSignUpMode;
-            if (isSignUpMode) {
-                authTitle.innerText = '✨ 新規アカウント登録';
-                authSubtitle.innerText = '新しいメールアドレスとパスワードを入力して登録します。';
-                btnAuthPrimary.innerText = 'アカウントを作成する';
-                btnAuthToggle.innerText = '既にアカウントをお持ちの方（ログイン）';
-            } else {
-                authTitle.innerText = '🚀 AIコンペ開発システムへログイン';
-                authSubtitle.innerText = 'メールアドレスとパスワードを入力してください。';
-                btnAuthPrimary.innerText = 'ログインする';
-                btnAuthToggle.innerText = '初めての方はこちら（新規アカウント登録）';
-            }
-        });
-
-        // 認証処理（ログイン実行 または アカウント作成）
-        btnAuthPrimary.addEventListener('click', async () => {
-            const email = authEmail.value.trim();
-            const password = authPassword.value;
-
-            if (!email || !password) {
-                alert('メールアドレスとパスワードを入力してください。');
-                return;
+        function loadStateFromLocalStorage() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                try { AppState = JSON.parse(savedData); } catch (e) { console.error('データ読み込み失敗。', e); }
             }
 
-            setSyncStatus('syncing');
-
-            if (isSignUpMode) {
-                const { data, error } = await supabaseClient.auth.signUp({ email, password });
-                if (error) {
-                    alert(`登録エラー: ${error.message}`);
-                    setSyncStatus('error');
-                } else {
-                    alert('アカウントの作成に成功しました！自動的にログインします。');
-                    authPassword.value = '';
-                }
-            } else {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) {
-                    alert(`ログインエラー: ${error.message}`);
-                    setSyncStatus('error');
-                } else {
-                    authPassword.value = '';
-                }
-            }
-        });
-
-        // ログアウト処理
-        btnLogout.addEventListener('click', async () => {
-            if (confirm('ログアウトしますか？')) {
-                if (timerInterval) btnStop.click(); // タイマー動作中なら安全のために強制終了
-                await supabaseClient.auth.signOut();
-                AppState = { level: 1, exp: 0, taskLogs: [] };
-                updateStatusUI();
-                renderCalendar();
-                renderLogs();
-            }
-        });
-
-        // --- 2. 状態管理（Supabase連携版セーブ＆ロード） ---
-        async function saveProfileToSupabase() {
-            if (!userId) return;
-            setSyncStatus('syncing');
-            const { error } = await supabaseClient
-                .from('user_profiles')
-                .upsert({ 
-                    user_id: userId, 
-                    level: AppState.level, 
-                    exp: AppState.exp,
-                    updated_at: new Date().toISOString()
-                });
-            
-            if (error) {
-                console.error('プロファイル同期エラー:', error);
-                setSyncStatus('error');
-            } else {
-                setSyncStatus('success');
-            }
-        }
-
-        async function loadStateFromSupabase() {
-            if (!userId) return;
-            setSyncStatus('syncing');
-            try {
-                // 1. レベル・EXPプロファイルのロード
-                const { data: profile, error: pError } = await supabaseClient
-                    .from('user_profiles')
-                    .select('level, exp')
-                    .eq('user_id', userId)
-                    .single();
-
-                if (pError && pError.code !== 'PGRST116') { 
-                    throw pError;
-                }
-
-                if (profile) {
-                    AppState.level = profile.level;
-                    AppState.exp = profile.exp;
-                } else {
-                    await supabaseClient.from('user_profiles').insert({ user_id: userId, level: 1, exp: 0 });
-                }
-
-                // 2. 全タスク実績ログのロード
-                const { data: logs, error: lError } = await supabaseClient
-                    .from('task_logs')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .order('end_time', { ascending: true });
-
-                if (lError) throw lError;
-
-                AppState.taskLogs = logs.map(log => ({
-                    id: log.id,
-                    taskName: log.task_name,
-                    startTime: log.start_time,
-                    endTime: log.end_time,
-                    durationSeconds: log.duration_seconds,
-                    expGained: log.exp_gained
-                }));
-
-                setSyncStatus('success');
-            } catch (e) {
-                console.error('Supabaseからのロードに失敗しました。', e);
-                setSyncStatus('error');
+            const savedReports = localStorage.getItem(AI_REPORTS_KEY);
+            if (savedReports) {
+                try { aiReports = JSON.parse(savedReports); } catch (e) { console.error('AI日報の読み込み失敗。', e); aiReports = {}; }
             }
 
             updateStatusUI();
             renderLogs();
             renderCalendar();
             setupTabEvents();
+        }
+
+        function saveAIReportsToLocalStorage() {
+            localStorage.setItem(AI_REPORTS_KEY, JSON.stringify(aiReports));
         }
 
         function getDateKey(date) {
@@ -434,7 +310,7 @@
                 const isToday = (currentLoopKey === todayKey);
 
                 if (isSelected) {
-                    dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-bold transition relative cursor-pointer active:scale-90 bg-indigo-600 text-white shadow-xs";
+                    dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-bold transition relative cursor-pointer active:scale-90 bg-indigo-600 text-white shadow-sm";
                 } else if (isToday) {
                     dayBtn.className = "h-8 w-8 mx-auto flex flex-col items-center justify-center rounded-full text-xs font-bold transition relative cursor-pointer active:scale-90 border-2 border-indigo-600 text-indigo-600";
                 } else {
@@ -482,11 +358,12 @@
             const filteredLogs = getFilteredLogsByDate(currentSelectedDate);
 
             renderUnifiedChart(filteredLogs, currentSelectedDate);
+            renderAIReportPanel(filteredLogs);
 
             const displayLogs = [...filteredLogs].reverse().slice(0, 5);
 
             if (displayLogs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 text-xs">選択された日のタスク実績はありません</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 text-xs">本日記録されたタスク実績はありません</td></tr>`;
                 return;
             }
 
@@ -502,18 +379,89 @@
                 const taskNameDisplay = log.taskName ? log.taskName : '名無しのタスク';
 
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition-colors text-xs text-slate-600 align-middle";
+                tr.className = "hover:bg-slate-50 transition-colors text-xs text-slate-600";
                 tr.innerHTML = `
-                    <td class="py-3 pl-1 font-medium text-slate-700 max-w-[160px] truncate" title="${taskNameDisplay}">${taskNameDisplay}</td>
-                    <td class="py-3 text-slate-400 font-mono">${timeString}</td>
-                    <td class="py-3 font-mono text-slate-500">${durationString}</td>
-                    <td class="py-3 pr-1 text-emerald-600 font-bold text-right font-mono">+${log.expGained}</td>
-                    <td class="py-3 pr-1 text-right">
-                        <button data-delete-log-id="${log.id}" class="text-slate-400 hover:text-rose-600 transition cursor-pointer p-1" title="このログを削除">🗑️</button>
+                    <td class="py-2.5 pl-1 font-medium text-slate-700 max-w-[160px] truncate" title="${taskNameDisplay}">${taskNameDisplay}</td>
+                    <td class="py-2.5 text-slate-400">${timeString}</td>
+                    <td class="py-2.5 font-mono text-slate-500">${durationString}</td>
+                    <td class="py-2.5 pr-1 text-emerald-600 font-bold text-right">+${log.expGained}</td>
+                    <td class="py-2.5 pr-1 text-right">
+                        <button data-delete-log-id="${log.id}" class="text-slate-400 hover:text-rose-600 transition cursor-pointer" title="このログを削除">🗑️</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function renderAIReportPanel(dayLogs) {
+            const dateKey = getDateKey(currentSelectedDate);
+            const report = aiReports[dateKey];
+            const emptyEl = document.getElementById('ai-report-empty');
+            const contentEl = document.getElementById('ai-report-content');
+            const deleteBtn = document.getElementById('btn-delete-ai-report');
+
+            if (!report) {
+                emptyEl.classList.remove('hidden');
+                contentEl.classList.add('hidden');
+                deleteBtn.classList.add('hidden');
+
+                if (!dayLogs || dayLogs.length === 0) {
+                    emptyEl.innerText = 'この日はログがないため、AI日報を生成できません。まずタスク計測を記録してください。';
+                } else {
+                    emptyEl.innerText = 'この日のAI日報は未作成です。「AI日報を生成」を押すと保存されます。';
+                }
+                return;
+            }
+
+            emptyEl.classList.add('hidden');
+            contentEl.classList.remove('hidden');
+            deleteBtn.classList.remove('hidden');
+
+            const labelDate = `${currentSelectedDate.getFullYear()}年${currentSelectedDate.getMonth() + 1}月${currentSelectedDate.getDate()}日`;
+            document.getElementById('ai-report-title').innerText = `${labelDate} のAI日報`;
+            document.getElementById('ai-report-summary').innerText = report.summary;
+            document.getElementById('ai-report-analysis').innerText = report.analysis;
+            document.getElementById('ai-report-advice').innerText = report.advice;
+        }
+
+        function generateAIReportFromLogs(dayLogs) {
+            const totalSeconds = dayLogs.reduce((acc, log) => acc + (log.durationSeconds || 0), 0);
+            const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
+            const totalExp = dayLogs.reduce((acc, log) => acc + (log.expGained || 0), 0);
+
+            const taskMinutes = {};
+            dayLogs.forEach(log => {
+                const taskName = (log.taskName && log.taskName.trim()) ? log.taskName.trim() : '名無しのタスク';
+                taskMinutes[taskName] = (taskMinutes[taskName] || 0) + Math.max(1, Math.round((log.durationSeconds || 0) / 60));
+            });
+
+            const sortedTasks = Object.entries(taskMinutes).sort((a, b) => b[1] - a[1]);
+            const topTask = sortedTasks[0];
+            const taskCount = Object.keys(taskMinutes).length;
+            const focusRatio = topTask ? Math.round((topTask[1] / totalMinutes) * 100) : 0;
+
+            let workloadTone = '安定稼働';
+            if (totalMinutes >= 300) workloadTone = '高稼働';
+            if (totalMinutes <= 90) workloadTone = '軽量稼働';
+
+            const analysisPool = [
+                `主力タスク「${topTask ? topTask[0] : 'タスク'}」に${focusRatio}%の時間を投下しており、集中配分は良好です。`,
+                `タスク数は${taskCount}件で、切り替え頻度は${taskCount >= 5 ? 'やや高め' : '適切'}です。優先順位の維持が成果につながっています。`,
+                `総獲得EXPは${totalExp}で、日次の積み上げとしては${totalExp >= 3600 ? '非常に高水準' : '堅実'}です。`
+            ];
+
+            const advicePool = [
+                `明日は開始 30 分で最重要タスクを先行処理し、初速を作るとさらに効率が上がります。`,
+                `同種タスクを連続でまとめるブロック運用にすると、切り替えコストを圧縮できます。`,
+                `終業前に 5 分だけ振り返りを入れると、次日の着手がスムーズになります。`
+            ];
+
+            return {
+                summary: `${workloadTone}の1日でした。合計${totalMinutes}分の作業で${taskCount}件を処理し、主軸は「${topTask ? topTask[0] : 'タスク'}」でした。`,
+                analysis: analysisPool[Math.floor(Math.random() * analysisPool.length)],
+                advice: advicePool[Math.floor(Math.random() * advicePool.length)],
+                generatedAt: new Date().toISOString()
+            };
         }
 
         // --- 6. 経験値＆逆算レベルアップロジック ---
@@ -535,7 +483,7 @@
             AppState.exp = currentTotal;
         }
 
-        async function deductExp(amount) {
+        function deductExp(amount) {
             let total = 0;
             for (let i = 1; i < AppState.level; i++) {
                 total += i * EXP_BASE;
@@ -543,31 +491,17 @@
             total += AppState.exp;
 
             recalculateLevelFromTotalExp(total - amount);
-            await saveProfileToSupabase();
         }
 
-        async function deleteLogById(logId) {
+        function deleteLogById(logId) {
             const index = AppState.taskLogs.findIndex(log => log.id === logId);
             if (index === -1) return;
 
-            setSyncStatus('syncing');
-            const { error } = await supabaseClient
-                .from('task_logs')
-                .delete()
-                .eq('id', logId);
-
-            if (error) {
-                console.error('Supabaseからのログ削除に失敗:', error);
-                setSyncStatus('error');
-                alert('ログの削除に失敗しました。');
-                return;
-            }
-
             const removedLog = AppState.taskLogs[index];
             AppState.taskLogs.splice(index, 1);
-            
-            await deductExp(removedLog.expGained || 0);
+            deductExp(removedLog.expGained || 0);
 
+            saveStateToLocalStorage();
             updateStatusUI();
             renderLogs();
             renderCalendar();
@@ -593,19 +527,16 @@
                 const taskSummary = {};
                 dayLogs.forEach(log => {
                     const name = log.taskName ? log.taskName.trim() : '名無しのタスク';
-                    const min = log.durationSeconds / 60;
+                    const min = Math.max(1, Math.round(log.durationSeconds / 60));
                     taskSummary[name] = (taskSummary[name] || 0) + min;
                 });
-
-                const labels = Object.keys(taskSummary);
-                const dataValues = Object.values(taskSummary).map(v => Math.round(v * 10) / 10);
 
                 globalChartInstance = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
-                        labels: labels,
+                        labels: Object.keys(taskSummary),
                         datasets: [{
-                            data: dataValues,
+                            data: Object.values(taskSummary),
                             backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ec4899', '#3b82f6', '#8b5cf6'],
                             borderWidth: 2,
                             borderColor: '#ffffff'
@@ -616,12 +547,7 @@
                         maintainAspectRatio: false,
                         layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } },
                         plugins: {
-                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) { return ` ${context.label}: ${context.raw} 分`; }
-                                }
-                            }
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
                         }
                     }
                 });
@@ -640,22 +566,19 @@
 
                 const weeklyMinutes = new Array(7).fill(0);
                 AppState.taskLogs.forEach(log => {
-                    const logDate = new Date(log.endTime);
-                    const logKey = getDateKey(logDate);
+                    const logKey = getDateKey(new Date(log.endTime));
                     const idx = dateKeys.indexOf(logKey);
                     if (idx !== -1) {
-                        weeklyMinutes[idx] += log.durationSeconds / 60;
+                        weeklyMinutes[idx] += Math.max(1, Math.round(log.durationSeconds / 60));
                     }
                 });
-
-                const roundedWeeklyMinutes = weeklyMinutes.map(v => Math.round(v * 10) / 10);
 
                 globalChartInstance = new Chart(ctx, {
                     type: 'bar',
                     data: {
                         labels: dateLabels,
                         datasets: [{
-                            data: roundedWeeklyMinutes,
+                            data: weeklyMinutes,
                             backgroundColor: 'rgba(79, 70, 229, 0.85)',
                             hoverBackgroundColor: '#4f46e5',
                             borderRadius: 4
@@ -666,22 +589,10 @@
                         maintainAspectRatio: false,
                         layout: { padding: { top: 10, bottom: 5, left: 5, right: 5 } },
                         scales: {
-                            y: { 
-                                beginAtZero: true, 
-                                ticks: { font: { size: 9 } }, 
-                                grid: { color: '#f1f5f9' },
-                                title: { display: true, text: '分', font: { size: 9 } }
-                            },
+                            y: { beginAtZero: true, ticks: { font: { size: 9 } }, grid: { color: '#f1f5f9' } },
                             x: { ticks: { font: { size: 9 } }, grid: { display: false } }
                         },
-                        plugins: { 
-                            legend: { display: false },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) { return ` 作業時間: ${context.raw} 分`; }
-                                }
-                            }
-                        }
+                        plugins: { legend: { display: false } }
                     }
                 });
             }
@@ -705,7 +616,7 @@
         }
 
         // --- 8. 経験値の獲得ロジック ---
-        async function gainExp(amount) {
+        function gainExp(amount) {
             AppState.exp += amount;
             let leveledUp = false;
 
@@ -715,15 +626,15 @@
                 leveledUp = true;
             }
 
-            updateStatusUI();
-            await saveProfileToSupabase();
-
             if (leveledUp) {
                 alert(`🎉 レベルアップ！ Lv.${AppState.level} になりました！`);
             }
+
+            updateStatusUI();
+            saveStateToLocalStorage();
         }
 
-        // --- 9. タイマー機能のロジック ---
+        // --- 9. タイマー機能のロジック（リロード・バリデーション対策版） ---
         function runTimerDisplayUpdate() {
             const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
             const hrs = Math.floor(elapsed / 3600).toString().padStart(2, '0');
@@ -732,6 +643,7 @@
             timerDisplay.innerText = `${hrs}:${mins}:${secs}`;
         }
 
+        // F5リロード後にタイマーが走っていたら自動復元する関数
         function checkAndResumeTimer() {
             const savedStartTime = localStorage.getItem(RUNNING_TIMER_START_KEY);
             const savedTaskName = localStorage.getItem(RUNNING_TIMER_NAME_KEY);
@@ -740,11 +652,13 @@
                 timerStartTime = parseInt(savedStartTime, 10);
                 taskNameInput.value = savedTaskName || '';
 
+                // UIの見た目を計測中に変更
                 btnStart.classList.add('hidden');
                 btnStop.classList.remove('hidden');
                 taskNameInput.disabled = true;
                 taskNameInput.classList.add('bg-slate-100', 'text-slate-400');
 
+                // 即座に一度表示を合わせ、インターバルを再開
                 runTimerDisplayUpdate();
                 timerInterval = setInterval(runTimerDisplayUpdate, 250);
             }
@@ -753,6 +667,7 @@
         btnStart.addEventListener('click', () => {
             const currentTaskName = taskNameInput.value.trim();
             
+            // バリデーション①: 空文字制限
             if (!currentTaskName) {
                 alert('計測を開始するにはタスク名を入力してください。');
                 return;
@@ -765,13 +680,14 @@
 
             timerStartTime = Date.now();
             
+            // リロード対策: 状態の永続化保存
             localStorage.setItem(RUNNING_TIMER_START_KEY, timerStartTime.toString());
             localStorage.setItem(RUNNING_TIMER_NAME_KEY, currentTaskName);
 
             timerInterval = setInterval(runTimerDisplayUpdate, 250);
         });
 
-        btnStop.addEventListener('click', async () => {
+        btnStop.addEventListener('click', () => {
             if (!timerInterval) return;
             clearInterval(timerInterval);
             timerInterval = null;
@@ -784,9 +700,11 @@
             taskNameInput.disabled = false;
             taskNameInput.classList.remove('bg-slate-100', 'text-slate-400');
 
+            // 一時保存データの破棄
             localStorage.removeItem(RUNNING_TIMER_START_KEY);
             localStorage.removeItem(RUNNING_TIMER_NAME_KEY);
 
+            // バリデーション②: 誤操作（短時間）ガード（5秒未満は切り捨て）
             if (durationSeconds < 5) {
                 alert('計測時間が5秒未満のため、実績ログには記録されませんでした。');
                 taskNameInput.value = '';
@@ -796,49 +714,27 @@
             const expGained = durationSeconds; 
             const currentTaskName = taskNameInput.value.trim();
             const now = new Date();
-            const generatedId = crypto.randomUUID ? crypto.randomUUID() : 'log_' + Date.now();
+            const logTimestamp = new Date(currentSelectedDate.getTime());
+            logTimestamp.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
 
             const newLog = {
-                id: generatedId,
+                id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
                 taskName: currentTaskName,
-                startTime: new Date(now.getTime() - (durationSeconds * 1000)).toISOString(),
-                endTime: now.toISOString(),
+                startTime: new Date(logTimestamp.getTime() - (durationSeconds * 1000)).toISOString(),
+                endTime: logTimestamp.toISOString(),
                 durationSeconds: durationSeconds,
                 expGained: expGained
             };
 
-            setSyncStatus('syncing');
-            const { error } = await supabaseClient
-                .from('task_logs')
-                .insert([{
-                    id: newLog.id,
-                    user_id: userId,
-                    task_name: newLog.taskName,
-                    start_time: newLog.startTime,
-                    end_time: newLog.endTime,
-                    duration_seconds: newLog.durationSeconds,
-                    exp_gained: newLog.expGained
-                }]);
-
-            if (error) {
-                console.error('Supabaseへのタスク保存に失敗しました:', error);
-                setSyncStatus('error');
-                alert('クラウドへのタスク保存に失敗しました。');
-                return;
-            }
-
             AppState.taskLogs.push(newLog);
-            
-            currentSelectedDate = new Date();
-            calendarCurrentMonthDate = new Date();
-            
-            renderCalendar();
+            saveStateToLocalStorage();
             renderLogs();
-            
-            await gainExp(expGained);
+            renderCalendar();
+            gainExp(expGained);
             taskNameInput.value = '';
         });
 
+        // ログ一覧の削除イベント受付
         document.getElementById('log-table-body').addEventListener('click', (event) => {
             const target = event.target.closest('[data-delete-log-id]');
             if (!target) return;
@@ -846,53 +742,67 @@
             if (logId) deleteLogById(logId);
         });
 
-        btnResetAll.addEventListener('click', async () => {
-            if (confirm('【注意】クラウドに保存されているすべての実績ログ、レベル、データが完全に消去されます。よろしいですか？')) {
-                setSyncStatus('syncing');
-                
-                const { error: lError } = await supabaseClient.from('task_logs').delete().eq('user_id', userId);
-                const { error: pError } = await supabaseClient.from('user_profiles').upsert({ user_id: userId, level: 1, exp: 0 });
+        // AI日報ボタンイベント
+        btnGenerateAIReport.addEventListener('click', async () => {
+            const dateKey = getDateKey(currentSelectedDate);
+            const dayLogs = getFilteredLogsByDate(currentSelectedDate);
 
-                if (lError || pError) {
-                    console.error('初期化エラー:', lError, pError);
-                    setSyncStatus('error');
-                    alert('データの初期化中にエラーが発生しました。');
-                    return;
-                }
+            if (dayLogs.length === 0) {
+                alert('この日はログがないため、AI日報を生成できません。');
+                return;
+            }
 
-                localStorage.removeItem(RUNNING_TIMER_START_KEY);
-                localStorage.removeItem(RUNNING_TIMER_NAME_KEY);
-                
+            btnGenerateAIReport.disabled = true;
+            btnGenerateAIReport.classList.add('opacity-60', 'cursor-not-allowed');
+            aiReportLoading.classList.remove('hidden');
+
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            aiReports[dateKey] = generateAIReportFromLogs(dayLogs);
+            saveAIReportsToLocalStorage();
+
+            aiReportLoading.classList.add('hidden');
+            btnGenerateAIReport.disabled = false;
+            btnGenerateAIReport.classList.remove('opacity-60', 'cursor-not-allowed');
+            renderLogs();
+        });
+
+        btnDeleteAIReport.addEventListener('click', () => {
+            const dateKey = getDateKey(currentSelectedDate);
+            if (!aiReports[dateKey]) return;
+            delete aiReports[dateKey];
+            saveAIReportsToLocalStorage();
+            renderLogs();
+        });
+
+        // 全データの初期化（開発・データ詰まり対策用）
+        btnResetAll.addEventListener('click', () => {
+            if (confirm('【注意】これまでのすべての実績ログ、レベル、AI日報データが完全に消去されます。よろしいですか？')) {
+                localStorage.clear();
                 AppState = { level: 1, exp: 0, taskLogs: [] };
+                aiReports = {};
                 timerStartTime = null;
                 if(timerInterval) clearInterval(timerInterval);
                 timerDisplay.innerText = "00:00:00";
                 
+                // UI状態のリセット
                 btnStart.classList.remove('hidden');
                 btnStop.classList.add('hidden');
                 taskNameInput.disabled = false;
                 taskNameInput.classList.remove('bg-slate-100', 'text-slate-400');
                 taskNameInput.value = '';
 
-                currentSelectedDate = new Date();
-                calendarCurrentMonthDate = new Date();
-
                 updateStatusUI();
                 renderCalendar();
                 renderLogs();
-                setSyncStatus('success');
                 alert('すべてのデータを初期化しました。');
             }
         });
 
         // --- 10. アプリ起動時の初期化処理 ---
-        window.addEventListener('DOMContentLoaded', async () => {
-            // Supabaseの認証ステータスの変化を24時間常に監視するリスナーを設置
-            supabaseClient.auth.onAuthStateChange((event, session) => {
-                handleAuthStateChange(session);
-            });
-
-            checkAndResumeTimer(); 
+        window.addEventListener('DOMContentLoaded', () => {
+            loadStateFromLocalStorage();
+            checkAndResumeTimer(); // 起動時にリロード対策のチェックを走らせる
         });
 
     </script>
